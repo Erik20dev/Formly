@@ -1,0 +1,999 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101828" />
+  <meta
+    name="description"
+    content="Discover Formly, the interactive form builder that turns forms into simple, conversational experiences."
+  />
+  <title>Formly — Forms that feel like conversations</title>
+
+  <style>
+    :root {
+      --ink: #101828;
+      --muted: #667085;
+      --primary: #6246ea;
+      --primary-dark: #4f35cc;
+      --soft: #f6f5ff;
+      --line: #eaecf0;
+      --white: #ffffff;
+      --green: #12b76a;
+      --radius: 22px;
+      --shadow: 0 20px 70px rgba(16, 24, 40, .09);
+    }
+
+    * { box-sizing: border-box; }
+
+    html {
+      scroll-behavior: smooth;
+      scroll-padding-top: 90px;
+    }
+
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+    button, a { -webkit-tap-highlight-color: transparent; }
+    button { font: inherit; }
+
+    .container {
+      width: min(1120px, calc(100% - 40px));
+      margin-inline: auto;
+    }
+
+    .announcement {
+      padding: 9px 16px;
+      text-align: center;
+      color: white;
+      background: var(--ink);
+      font-size: 13px;
+    }
+
+    .announcement span { color: #c4b5fd; font-weight: 800; }
+
+    header {
+      position: sticky;
+      top: 0;
+      z-index: 20;
+      background: rgba(255,255,255,.94);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .nav {
+      min-height: 76px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 11px;
+      font-size: 24px;
+      font-weight: 900;
+      letter-spacing: -1.1px;
+    }
+
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 39px;
+      height: 39px;
+      border-radius: 13px;
+      background: var(--primary);
+      color: white;
+      font-size: 22px;
+      box-shadow: 0 7px 18px #6246ea35;
+    }
+
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 30px;
+      color: #475467;
+      font-size: 14px;
+      font-weight: 650;
+    }
+
+    .nav-links a:hover { color: var(--primary); }
+
+    .button {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 9px;
+      min-height: 46px;
+      padding: 12px 19px;
+      border: 1px solid transparent;
+      border-radius: 12px;
+      font-weight: 750;
+      font-size: 14px;
+      cursor: pointer;
+      transition: transform .2s, background .2s, box-shadow .2s;
+    }
+
+    .button:hover { transform: translateY(-2px); }
+
+    .button-primary {
+      background: var(--primary);
+      color: white;
+      box-shadow: 0 8px 20px #6246ea30;
+    }
+
+    .button-primary:hover { background: var(--primary-dark); }
+
+    .button-outline {
+      background: white;
+      border-color: #d0d5dd;
+      color: var(--ink);
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      padding: 90px 0 82px;
+      background:
+        radial-gradient(ellipse at 78% 22%, #e9e4ff 0, transparent 35%),
+        radial-gradient(ellipse at 10% 80%, #f0f9ff 0, transparent 30%),
+        #fff;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.05fr .95fr;
+      align-items: center;
+      gap: 65px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 12px;
+      border: 1px solid #e4ddff;
+      border-radius: 99px;
+      color: #5338c8;
+      background: #f6f3ff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .4px;
+      text-transform: uppercase;
+    }
+
+    .eyebrow-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 0 4px #12b76a20;
+    }
+
+    h1 {
+      max-width: 660px;
+      margin: 24px 0 20px;
+      font-size: clamp(42px, 5.3vw, 68px);
+      line-height: 1.06;
+      letter-spacing: -3.8px;
+    }
+
+    .gradient-text {
+      color: var(--primary);
+    }
+
+    .hero-copy {
+      max-width: 550px;
+      color: var(--muted);
+      font-size: 18px;
+      line-height: 1.8;
+    }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 29px;
+    }
+
+    .trust-note {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      margin-top: 24px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .trust-note strong { color: #344054; }
+
+    .demo-window {
+      position: relative;
+      padding: 13px;
+      border: 1px solid #e4e7ec;
+      border-radius: 25px;
+      background: white;
+      box-shadow: 0 32px 90px #20105c1a;
+      transform: rotate(1deg);
+    }
+
+    .window-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 8px 15px;
+    }
+
+    .window-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #d0d5dd;
+    }
+
+    .window-url {
+      flex: 1;
+      margin-left: 8px;
+      padding: 7px;
+      border-radius: 8px;
+      background: #f9fafb;
+      color: #98a2b3;
+      text-align: center;
+      font-size: 11px;
+    }
+
+    .chat-preview {
+      overflow: hidden;
+      padding: 22px;
+      border-radius: 17px;
+      background: linear-gradient(140deg, #f7f5ff, #f8fafc);
+    }
+
+    .chat-heading {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 22px;
+    }
+
+    .chat-avatar {
+      display: grid;
+      place-items: center;
+      width: 44px;
+      height: 44px;
+      flex-shrink: 0;
+      border-radius: 15px;
+      color: white;
+      background: var(--primary);
+      font-size: 21px;
+    }
+
+    .chat-heading strong { display: block; font-size: 14px; }
+    .chat-heading small { color: var(--muted); font-size: 12px; }
+
+    .message {
+      width: fit-content;
+      max-width: 95%;
+      margin-bottom: 12px;
+      padding: 13px 15px;
+      border: 1px solid #eaecf0;
+      border-radius: 14px 14px 14px 4px;
+      background: white;
+      color: #344054;
+      font-size: 13px;
+    }
+
+    .message.user {
+      margin-left: auto;
+      border-color: var(--primary);
+      border-radius: 14px 14px 4px 14px;
+      background: var(--primary);
+      color: white;
+    }
+
+    .choice-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: 13px 0 18px;
+    }
+
+    .choice {
+      padding: 9px 14px;
+      border: 1px solid #d9d6fe;
+      border-radius: 10px;
+      background: white;
+      color: #5338c8;
+      font-size: 12px;
+      font-weight: 750;
+    }
+
+    .preview-progress {
+      height: 5px;
+      overflow: hidden;
+      margin-top: 20px;
+      border-radius: 10px;
+      background: #e4e7ec;
+    }
+
+    .preview-progress span {
+      display: block;
+      width: 65%;
+      height: 100%;
+      border-radius: inherit;
+      background: var(--primary);
+    }
+
+    .section {
+      padding: 88px 0;
+    }
+
+    .section-soft { background: #f9fafb; }
+
+    .section-heading {
+      max-width: 680px;
+      margin: 0 auto 45px;
+      text-align: center;
+    }
+
+    .section-heading h2 {
+      margin: 15px 0;
+      font-size: clamp(30px, 4vw, 43px);
+      line-height: 1.2;
+      letter-spacing: -1.8px;
+    }
+
+    .section-heading p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.8;
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+    }
+
+    .feature-card {
+      padding: 28px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-4px);
+      box-shadow: var(--shadow);
+    }
+
+    .feature-icon {
+      display: grid;
+      place-items: center;
+      width: 51px;
+      height: 51px;
+      border-radius: 15px;
+      background: #f0edff;
+      font-size: 24px;
+    }
+
+    .feature-card h3 {
+      margin: 20px 0 8px;
+      font-size: 18px;
+      letter-spacing: -.4px;
+    }
+
+    .feature-card p {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.8;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 30px;
+    }
+
+    .step-card {
+      position: relative;
+      padding: 25px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+    }
+
+    .step-number {
+      display: grid;
+      place-items: center;
+      width: 42px;
+      height: 42px;
+      border-radius: 13px;
+      background: var(--primary);
+      color: white;
+      font-weight: 900;
+    }
+
+    .step-card h3 { margin: 20px 0 9px; }
+    .step-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .widget-callout {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      align-items: center;
+      gap: 35px;
+      padding: 38px;
+      border-radius: 26px;
+      color: white;
+      background: linear-gradient(120deg, #21164d, #6246ea);
+    }
+
+    .widget-callout h2 {
+      margin: 0 0 12px;
+      font-size: clamp(27px, 3.5vw, 39px);
+      letter-spacing: -1.5px;
+      line-height: 1.2;
+    }
+
+    .widget-callout p {
+      max-width: 610px;
+      margin: 0;
+      color: #e5e0ff;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+
+    .widget-callout .button {
+      color: var(--primary);
+      background: white;
+      white-space: nowrap;
+    }
+
+    .contact-grid {
+      display: grid;
+      grid-template-columns: .9fr 1.1fr;
+      gap: 45px;
+      align-items: start;
+    }
+
+    .contact-copy h2 {
+      margin: 12px 0;
+      font-size: 38px;
+      line-height: 1.15;
+      letter-spacing: -1.5px;
+    }
+
+    .contact-copy p {
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .contact-points {
+      display: grid;
+      gap: 15px;
+      margin-top: 25px;
+    }
+
+    .contact-point {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      color: #475467;
+      font-size: 14px;
+    }
+
+    .contact-point span:first-child { font-size: 21px; }
+
+    .contact-card {
+      padding: 30px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: white;
+      box-shadow: var(--shadow);
+    }
+
+    .contact-card h3 { margin: 0 0 6px; font-size: 22px; }
+    .contact-card > p { margin: 0 0 22px; color: var(--muted); font-size: 14px; }
+
+    .field-group { margin-bottom: 17px; }
+
+    .field-group label {
+      display: block;
+      margin-bottom: 7px;
+      font-size: 13px;
+      font-weight: 750;
+    }
+
+    .field-group input,
+    .field-group textarea {
+      display: block;
+      width: 100%;
+      padding: 12px 14px;
+      border: 1px solid #d0d5dd;
+      border-radius: 10px;
+      outline: none;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 14px;
+    }
+
+    .field-group input:focus,
+    .field-group textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 4px #6246ea18;
+    }
+
+    .field-group textarea { min-height: 100px; resize: vertical; }
+
+    .form-message {
+      min-height: 24px;
+      margin-top: 12px;
+      color: #067647;
+      font-size: 13px;
+    }
+
+    footer {
+      padding: 35px 0;
+      border-top: 1px solid var(--line);
+      background: white;
+    }
+
+    .footer-inner {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 25px;
+    }
+
+    .footer-copy { color: var(--muted); font-size: 13px; }
+
+    .footer-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 20px;
+      color: #475467;
+      font-size: 13px;
+    }
+
+    .footer-links a:hover { color: var(--primary); }
+
+    .widget-hint {
+      position: fixed;
+      right: 24px;
+      bottom: 95px;
+      z-index: 10;
+      max-width: 225px;
+      padding: 11px 14px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 8px 30px #10182818;
+      color: #344054;
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    @media (max-width: 850px) {
+      .hero { padding: 65px 0; }
+      .hero-grid { grid-template-columns: 1fr; gap: 40px; }
+      .hero-copy { font-size: 16px; }
+      .demo-window { max-width: 550px; width: 100%; margin-inline: auto; }
+      .features, .steps { grid-template-columns: repeat(2, 1fr); }
+      .contact-grid { grid-template-columns: 1fr; }
+      .nav-links { gap: 16px; }
+    }
+
+    @media (max-width: 600px) {
+      .container { width: min(100% - 30px, 1120px); }
+      .announcement { font-size: 11px; }
+      .nav { min-height: 66px; gap: 12px; }
+      .brand { font-size: 21px; }
+      .brand-mark { width: 35px; height: 35px; }
+      .nav-links { display: none; }
+      .nav > .button { padding: 10px 12px; min-height: 40px; font-size: 12px; }
+      .hero { padding: 54px 0; }
+      h1 { font-size: clamp(39px, 12vw, 54px); letter-spacing: -2.5px; }
+      .hero-copy { font-size: 15px; }
+      .hero-actions .button { flex: 1; }
+      .section { padding: 65px 0; }
+      .features, .steps { grid-template-columns: 1fr; }
+      .feature-card { padding: 23px; }
+      .widget-callout { grid-template-columns: 1fr; padding: 27px; gap: 22px; }
+      .widget-callout .button { justify-self: start; }
+      .contact-card { padding: 22px; }
+      .footer-inner { align-items: flex-start; flex-direction: column; }
+      .footer-links { gap: 14px; }
+      .widget-hint { right: 16px; bottom: 88px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        scroll-behavior: auto !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="announcement">
+    A better way to collect responses. <span>Meet Formly ✦</span>
+  </div>
+
+  <header>
+    <nav class="nav container" aria-label="Main navigation">
+      <a class="brand" href="#home" aria-label="Formly home">
+        <span class="brand-mark">✦</span>
+        Formly
+      </a>
+
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="#try-demo">Try the demo</a>
+        <a href="#contact">Contact</a>
+      </div>
+
+      <a class="button button-primary" href="/dashboard">
+        Open dashboard <span aria-hidden="true">↗</span>
+      </a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="hero" id="home">
+      <div class="container hero-grid">
+        <div>
+          <div class="eyebrow">
+            <span class="eyebrow-dot"></span>
+            Interactive forms made easy
+          </div>
+
+          <h1>
+            Forms that feel like
+            <span class="gradient-text">conversations.</span>
+          </h1>
+
+          <p class="hero-copy">
+            Create engaging forms, ask one question at a time, and collect
+            meaningful responses without making people work through
+            complicated pages.
+          </p>
+
+          <div class="hero-actions">
+            <a class="button button-primary" href="/dashboard">
+              Create your first form <span aria-hidden="true">→</span>
+            </a>
+            <a class="button button-outline" href="#try-demo">
+              Try the live demo
+            </a>
+          </div>
+
+          <div class="trust-note">
+            <span aria-hidden="true">✓</span>
+            <span><strong>Simple to use.</strong> Responsive on desktop and mobile.</span>
+          </div>
+        </div>
+
+        <div class="demo-window" aria-label="Illustration of a conversational form">
+          <div class="window-top">
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+            <span class="window-dot"></span>
+            <div class="window-url">formly.app / interactive-form</div>
+          </div>
+
+          <div class="chat-preview">
+            <div class="chat-heading">
+              <div class="chat-avatar">✦</div>
+              <div>
+                <strong>Your friendly form assistant</strong>
+                <small>● Ready to help</small>
+              </div>
+            </div>
+
+            <div class="message">
+              Hi there! 👋 Let's get started. What's your favorite kind of ice cream?
+            </div>
+
+            <div class="message user">Chocolate 🍫</div>
+
+            <div class="message">
+              Great choice! Thanks for sharing your answer.
+            </div>
+
+            <div class="choice-row">
+              <span class="choice">Vanilla</span>
+              <span class="choice">Chocolate</span>
+              <span class="choice">Strawberry</span>
+            </div>
+
+            <div class="preview-progress"><span></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="features">
+      <div class="container">
+        <div class="section-heading">
+          <div class="eyebrow">Designed for people</div>
+          <h2>Everything you need to collect better responses</h2>
+          <p>
+            Build a form, customize its appearance, share it with your audience,
+            and manage responses in one convenient place.
+          </p>
+        </div>
+
+        <div class="features">
+          <article class="feature-card">
+            <div class="feature-icon">💬</div>
+            <h3>Conversational experience</h3>
+            <p>
+              Present questions one at a time to create a clear, focused
+              experience that feels natural to complete.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">🎨</div>
+            <h3>Your own style</h3>
+            <p>
+              Customize your form's title, welcome message, completion message,
+              and accent color to match your needs.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">📊</div>
+            <h3>Organized responses</h3>
+            <p>
+              Save submissions and review collected answers from your
+              dashboard instead of searching through messages.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">⚡</div>
+            <h3>Quick form building</h3>
+            <p>
+              Add questions, mark fields as required, choose question types,
+              and create a form without starting from scratch.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">🧩</div>
+            <h3>Embeddable widget</h3>
+            <p>
+              Add a floating chat-style form to a compatible website using
+              a small JavaScript embed snippet.
+            </p>
+          </article>
+
+          <article class="feature-card">
+            <div class="feature-icon">📱</div>
+            <h3>Responsive by design</h3>
+            <p>
+              Give visitors a more comfortable experience across desktop,
+              tablet, and mobile screen sizes.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="how-it-works">
+      <div class="container">
+        <div class="section-heading">
+          <div class="eyebrow">Three simple steps</div>
+          <h2>From an idea to collected responses</h2>
+          <p>
+            Start with a question. Formly helps you turn it into a shareable
+            experience.
+          </p>
+        </div>
+
+        <div class="steps">
+          <article class="step-card">
+            <div class="step-number">01</div>
+            <h3>Create your form</h3>
+            <p>
+              Open your dashboard, create a form, add questions, and customize
+              how it looks and what it says.
+            </p>
+          </article>
+
+          <article class="step-card">
+            <div class="step-number">02</div>
+            <h3>Publish and share</h3>
+            <p>
+              Publish your form to make it available through its public URL.
+              You can also embed it on a website with the widget.
+            </p>
+          </article>
+
+          <article class="step-card">
+            <div class="step-number">03</div>
+            <h3>Review responses</h3>
+            <p>
+              Let visitors answer your questions and review saved submissions
+              in your Formly dashboard.
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="try-demo">
+      <div class="container">
+        <div class="widget-callout">
+          <div>
+            <h2>Want to see Formly in action?</h2>
+            <p>
+              Try the floating chat button in the bottom-right corner.
+              It opens the published “zhaba” test form so you can experience
+              the actual question flow and submit a real test response.
+            </p>
+          </div>
+          <a class="button" href="/forms/1593346d-f9e3-4c39-b2ba-fae52bbe7447">
+            Open full form <span aria-hidden="true">→</span>
+          </a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section section-soft" id="contact">
+      <div class="container contact-grid">
+        <div class="contact-copy">
+          <div class="eyebrow">Let's connect</div>
+          <h2>Make collecting information feel effortless.</h2>
+          <p>
+            Explore the Formly dashboard to create a form of your own,
+            publish it, and see how responses are organized.
+          </p>
+
+          <div class="contact-points">
+            <div class="contact-point">
+              <span aria-hidden="true">✓</span>
+              <span>Build and customize your questions</span>
+            </div>
+            <div class="contact-point">
+              <span aria-hidden="true">✓</span>
+              <span>Publish a shareable form</span>
+            </div>
+            <div class="contact-point">
+              <span aria-hidden="true">✓</span>
+              <span>Collect and review responses</span>
+            </div>
+          </div>
+
+          <div style="margin-top:26px">
+            <a class="button button-primary" href="/dashboard">
+              Go to dashboard →
+            </a>
+          </div>
+        </div>
+
+        <div class="contact-card">
+          <h3>Send a demo message</h3>
+          <p>
+            This sample contact form demonstrates the website layout.
+            It does not send or store information.
+          </p>
+
+          <form id="demo-contact">
+            <div class="field-group">
+              <label for="contact-name">Your name</label>
+              <input
+                id="contact-name"
+                name="name"
+                type="text"
+                placeholder="Enter your name"
+                autocomplete="name"
+                required
+              />
+            </div>
+
+            <div class="field-group">
+              <label for="contact-email">Email address</label>
+              <input
+                id="contact-email"
+                name="email"
+                type="email"
+                placeholder="you@example.com"
+                autocomplete="email"
+                required
+              />
+            </div>
+
+            <div class="field-group">
+              <label for="contact-message">What would you like to ask?</label>
+              <textarea
+                id="contact-message"
+                name="message"
+                placeholder="Write a short message..."
+                required
+              ></textarea>
+            </div>
+
+            <button class="button button-primary" type="submit" style="width:100%">
+              Preview message <span aria-hidden="true">→</span>
+            </button>
+
+            <div
+              class="form-message"
+              id="contact-status"
+              role="status"
+              aria-live="polite"
+            ></div>
+          </form>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="container footer-inner">
+      <a class="brand" href="#home">
+        <span class="brand-mark">✦</span>
+        Formly
+      </a>
+
+      <div class="footer-copy">
+        © <span id="year"></span> Formly. Interactive forms made easier.
+      </div>
+
+      <div class="footer-links">
+        <a href="#features">Features</a>
+        <a href="#how-it-works">How it works</a>
+        <a href="/dashboard">Dashboard</a>
+      </div>
+    </div>
+  </footer>
+
+  <div class="widget-hint" id="widget-hint">
+    Need to try the form? Click the ✦ chat button!
+  </div>
+
+  <script>
+    document.getElementById("year").textContent =
+      new Date().getFullYear();
+
+    document.getElementById("demo-contact").addEventListener("submit", function (event) {
+      event.preventDefault();
+
+      document.getElementById("contact-status").textContent =
+        "Demo only: your message was not sent or saved. Try the Formly chat widget to submit a real form response.";
+
+      this.reset();
+    });
+
+    // Hide the helper tip after the visitor has had time to notice it.
+    window.setTimeout(function () {
+      const hint = document.getElementById("widget-hint");
+      if (hint) hint.style.display = "none";
+    }, 9000);
+  </script>
+
+  <!-- Formly floating widget: loads the published test form -->
+  <script
+    src="/widget.js"
+    data-form-id="1593346d-f9e3-4c39-b2ba-fae52bbe7447"
+  ></script>
+</body>
+</html>
