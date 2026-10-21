@@ -46,7 +46,7 @@ export async function GET(request: Request) {
     if (
       !form ||
       !form.questions.some(
-        (question) => question.id === questionId && question.type === "file"
+        (question) => question.id === questionId && String(question.type) === "file"
       )
     ) {
       return NextResponse.json(
