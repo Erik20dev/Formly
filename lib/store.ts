@@ -175,7 +175,16 @@ function asQuestions(value: unknown): Question[] {
     return (
       typeof q.id === "string" &&
       typeof q.label === "string" &&
-      ["text", "email", "choice", "yesno"].includes(String(q.type)) &&
+     [
+  "text",
+  "email",
+  "choice",
+  "yesno",
+  "dropdown",
+  "rating",
+  "date",
+  "file",
+].includes(String(q.type)) &&
       typeof q.required === "boolean" &&
       (q.options === undefined ||
         (Array.isArray(q.options) &&
