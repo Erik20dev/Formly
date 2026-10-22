@@ -1,9 +1,21 @@
-
 "use client";
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import type { FormRecord, Question, QuestionCondition, Submission } from "@/lib/types";
+import type {
+  FormRecord,
+  Question,
+  QuestionCondition,
+  Submission,
+} from "@/lib/types";
+import { getFormAnalytics } from "@/lib/analytics";
+
+type AnalyticsEvent = {
+  form_id: string;
+  event_type: "view" | "start" | "completion";
+  session_id: string;
+  created_at: string;
+};
 
 const emptyForm = (): FormRecord => ({
   id: crypto.randomUUID(),
@@ -25,10 +37,9 @@ const emptyForm = (): FormRecord => ({
 });
 
 function defaultOptions(type: Question["type"]): string[] | undefined {
-  if (type === "choice" || type === "dropdown") {
-    return ["Option 1", "Option 2"];
-  }
-  return undefined;
+  return type === "choice" || type === "dropdown"
+    ? ["Option 1", "Option 2"]
+    : undefined;
 }
 
 function getConditionOptions(question: Question): string[] {
@@ -43,22 +54,32 @@ function getConditionOptions(question: Question): string[] {
 export default function Dashboard() {
   const [forms, setForms] = useState<FormRecord[]>([]);
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [analyticsEvents, setAnalyticsEvents] = useState<AnalyticsEvent[]>([]);
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
   const [editing, setEditing] = useState<FormRecord | null>(null);
   const [activeTab, setActiveTab] = useState<"forms" | "responses">("forms");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
 
-  const appUrl =
-    typeof window === "undefined" ? "" : window.location.origin;
+  const analytics = getFormAnalytics(
+    forms,
+    submissions,
+    startDate || undefined,
+    endDate || undefined,
+  );
+
+  const appUrl = typeof window === "undefined" ? "" : window.location.origin;
 
   async function refresh() {
     setLoading(true);
-
     try {
-      const [formsResponse, submissionsResponse] = await Promise.all([
-        fetch("/api/forms"),
-        fetch("/api/submissions"),
-      ]);
+      const [formsResponse, submissionsResponse, analyticsResponse] =
+        await Promise.all([
+          fetch("/api/forms"),
+          fetch("/api/submissions"),
+          fetch("/api/analytics"),
+        ]);
 
       if (!formsResponse.ok || !submissionsResponse.ok) {
         throw new Error("Could not load dashboard data.");
@@ -66,10 +87,15 @@ export default function Dashboard() {
 
       setForms(await formsResponse.json());
       setSubmissions(await submissionsResponse.json());
+
+      if (analyticsResponse.ok) {
+        const data = await analyticsResponse.json();
+        setAnalyticsEvents(data.events ?? []);
+      } else {
+        setAnalyticsEvents([]);
+      }
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : "Loading failed."
-      );
+      setMessage(error instanceof Error ? error.message : "Loading failed.");
     } finally {
       setLoading(false);
     }
@@ -80,10 +106,7 @@ export default function Dashboard() {
   }, []);
 
   async function save() {
-    if (!editing?.title.trim()) {
-      setMessage("Please enter a form title.");
-      return;
-    }
+    if (!editing) return;
 
     if (!editing.questions.length) {
       setMessage("Add at least one question before saving.");
@@ -99,27 +122,26 @@ export default function Dashboard() {
       editing.questions.some(
         (question) =>
           (question.type === "choice" || question.type === "dropdown") &&
-          !(question.options ?? []).some((option) => option.trim())
+          !(question.options ?? []).some((option) => option.trim()),
       )
     ) {
       setMessage(
-        "Add at least one option to each multiple-choice or dropdown question."
+        "Add at least one option to each multiple-choice or dropdown question.",
       );
       return;
     }
 
     const questionIds = new Set(editing.questions.map((question) => question.id));
-
     if (
       editing.questions.some(
         (question) =>
           question.condition &&
           (!questionIds.has(question.condition.questionId) ||
-            question.condition.questionId === question.id)
+            question.condition.questionId === question.id),
       )
     ) {
       setMessage(
-        "Each conditional rule must refer to a different question in this form."
+        "Each conditional rule must refer to a different question in this form.",
       );
       return;
     }
@@ -130,7 +152,6 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing),
       });
-
       const result = await response.json();
 
       if (!response.ok) {
@@ -148,17 +169,17 @@ export default function Dashboard() {
 
   async function remove(id: string) {
     if (!confirm("Delete this form and its saved responses?")) return;
-
-    const response = await fetch(`/api/forms/${id}`, {
-      method: "DELETE",
-    });
-
-    if (!response.ok) {
-      setMessage("Could not delete form.");
-      return;
+    try {
+      const response = await fetch(`/api/forms/${id}`, { method: "DELETE" });
+      if (!response.ok) {
+        setMessage("Could not delete form.");
+        return;
+      }
+      setMessage("Form deleted.");
+      await refresh();
+    } catch {
+      setMessage("Could not delete form. Please check your connection.");
     }
-
-    await refresh();
   }
 
   async function copy(text: string) {
@@ -170,30 +191,25 @@ export default function Dashboard() {
     }
   }
 
-  function updateQuestion(
-    index: number,
-    patch: Partial<Question>
-  ) {
+  function updateQuestion(index: number, patch: Partial<Question>) {
     if (!editing) return;
-
     setEditing({
       ...editing,
       questions: editing.questions.map((question, i) =>
-        i === index ? { ...question, ...patch } : question
+        i === index ? { ...question, ...patch } : question,
       ),
     });
   }
 
   function setQuestionCondition(
     index: number,
-    condition: QuestionCondition | undefined
+    condition: QuestionCondition | undefined,
   ) {
     updateQuestion(index, { condition });
   }
 
   function addQuestion() {
     if (!editing) return;
-
     setEditing({
       ...editing,
       questions: [
@@ -210,23 +226,18 @@ export default function Dashboard() {
 
   function moveQuestion(index: number, direction: -1 | 1) {
     if (!editing) return;
-
     const questions = [...editing.questions];
     const targetIndex = index + direction;
-
     if (targetIndex < 0 || targetIndex >= questions.length) return;
-
     [questions[index], questions[targetIndex]] = [
       questions[targetIndex],
       questions[index],
     ];
-
     setEditing({ ...editing, questions });
   }
 
   function deleteQuestion(id: string) {
     if (!editing) return;
-
     setEditing({
       ...editing,
       questions: editing.questions
@@ -234,9 +245,54 @@ export default function Dashboard() {
         .map((question) =>
           question.condition?.questionId === id
             ? { ...question, condition: undefined }
-            : question
+            : question,
         ),
     });
+  }
+
+  function exportAnalyticsCsv() {
+    const rows: string[][] = [
+      ["Form", "Total Responses", "Question", "Total Answers", "Answer", "Count"],
+    ];
+
+    for (const form of analytics) {
+      for (const question of form.responsesByQuestion) {
+        const answers = Object.entries(question.answerCounts);
+        if (answers.length === 0) {
+          rows.push([
+            form.title,
+            String(form.totalResponses),
+            question.questionLabel,
+            String(question.totalAnswers),
+            "",
+            "0",
+          ]);
+        } else {
+          for (const [answer, count] of answers) {
+            rows.push([
+              form.title,
+              String(form.totalResponses),
+              question.questionLabel,
+              String(question.totalAnswers),
+              answer,
+              String(count),
+            ]);
+          }
+        }
+      }
+    }
+
+    const escapeCsv = (value: string) => `"${value.replace(/"/g, '""')}"`;
+    const csv = rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n");
+    const blob = new Blob(["\uFEFF" + csv], {
+      type: "text/csv;charset=utf-8;",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "formly-analytics.csv";
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
@@ -292,6 +348,112 @@ export default function Dashboard() {
           <Stat label="Total responses" value={submissions.length} />
         </div>
 
+        <div className="mt-4 grid gap-4 sm:grid-cols-3">
+          <Stat
+            label="Form views"
+            value={analyticsEvents.filter((event) => event.event_type === "view").length}
+          />
+          <Stat
+            label="Form starts"
+            value={analyticsEvents.filter((event) => event.event_type === "start").length}
+          />
+          <Stat
+            label="Form completions"
+            value={analyticsEvents.filter((event) => event.event_type === "completion").length}
+          />
+        </div>
+
+        <section className="panel mt-6 p-5">
+          <h2 className="text-xl font-black">Response analytics</h2>
+          <p className="mt-1 text-sm text-slate-500">
+            See how many responses each form has received and review answers by question.
+          </p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="block text-sm font-semibold">
+              Start date
+              <input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+                className="mt-1 block w-full rounded-lg border border-slate-300 p-2"
+              />
+            </label>
+            <label className="block text-sm font-semibold">
+              End date
+              <input
+                type="date"
+                value={endDate}
+                min={startDate || undefined}
+                onChange={(event) => setEndDate(event.target.value)}
+                className="mt-1 block w-full rounded-lg border border-slate-300 p-2"
+              />
+            </label>
+          </div>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setStartDate("");
+                setEndDate("");
+              }}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+            >
+              Clear date filters
+            </button>
+            <button
+              type="button"
+              onClick={exportAnalyticsCsv}
+              className="rounded-lg bg-slate-900 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-700"
+            >
+              Export analytics CSV
+            </button>
+          </div>
+
+          {analytics.length === 0 ? (
+            <p className="mt-4 text-sm text-slate-500">
+              Create a form to start viewing analytics.
+            </p>
+          ) : (
+            <div className="mt-4 space-y-5">
+              {analytics.map((form) => (
+                <section key={form.formId} className="rounded-xl border p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h3 className="font-bold">{form.title}</h3>
+                    <span className="text-sm text-slate-500">
+                      {form.totalResponses} responses
+                    </span>
+                  </div>
+                  {form.responsesByQuestion.map((question) => (
+                    <div key={question.questionId} className="mt-4">
+                      <p className="text-sm font-semibold">{question.questionLabel}</p>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {question.totalAnswers} answers
+                      </p>
+                      {Object.keys(question.answerCounts).length > 0 ? (
+                        <ul className="mt-2 space-y-1">
+                          {Object.entries(question.answerCounts).map(([answer, count]) => (
+                            <li
+                              key={answer}
+                              className="flex justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                            >
+                              <span className="break-words">{answer}</span>
+                              <span className="shrink-0 font-bold">{count}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="mt-2 text-sm text-slate-400">
+                          No answers recorded yet.
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </div>
+          )}
+        </section>
+
         <div className="mt-8 flex gap-2 border-b">
           <button
             onClick={() => setActiveTab("forms")}
@@ -326,11 +488,7 @@ export default function Dashboard() {
                     <h2 className="text-lg font-bold">{form.title}</h2>
                     <p className="mt-1 text-sm text-slate-500">
                       {form.questions.length} questions ·{" "}
-                      {
-                        submissions.filter(
-                          (submission) => submission.formId === form.id
-                        ).length
-                      }{" "}
+                      {submissions.filter((submission) => submission.formId === form.id).length}{" "}
                       responses
                     </p>
                   </div>
@@ -344,11 +502,9 @@ export default function Dashboard() {
                     {form.published ? "Published" : "Draft"}
                   </span>
                 </div>
-
                 <p className="mt-4 line-clamp-2 min-h-10 text-sm text-slate-600">
                   {form.description || "No description added yet."}
                 </p>
-
                 <div className="mt-5 flex flex-wrap gap-2">
                   <button
                     className="btn btn-light text-sm"
@@ -357,12 +513,8 @@ export default function Dashboard() {
                         ...form,
                         questions: form.questions.map((question) => ({
                           ...question,
-                          options: question.options
-                            ? [...question.options]
-                            : undefined,
-                          condition: question.condition
-                            ? { ...question.condition }
-                            : undefined,
+                          options: question.options ? [...question.options] : undefined,
+                          condition: question.condition ? { ...question.condition } : undefined,
                         })),
                       })
                     }
@@ -379,7 +531,7 @@ export default function Dashboard() {
                     className="btn btn-light text-sm"
                     onClick={() =>
                       void copy(
-                        `<script src="${appUrl}/widget.js" data-form-id="${form.id}" defer></script>`
+                        `<script src="${appUrl}/widget.js" data-form-id="${form.id}" defer></script>`,
                       )
                     }
                   >
@@ -392,7 +544,6 @@ export default function Dashboard() {
                     Delete
                   </button>
                 </div>
-
                 {form.published && (
                   <Link
                     className="mt-4 inline-block text-sm font-bold text-indigo-700"
@@ -403,13 +554,10 @@ export default function Dashboard() {
                 )}
               </article>
             ))}
-
             {forms.length === 0 && (
               <div className="panel col-span-full p-10 text-center">
                 <div className="text-4xl">✦</div>
-                <h2 className="mt-3 text-xl font-bold">
-                  Your workspace starts here
-                </h2>
+                <h2 className="mt-3 text-xl font-bold">Your workspace starts here</h2>
                 <p className="mt-2 text-slate-500">
                   Create your first form to start collecting responses.
                 </p>
@@ -424,96 +572,78 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="mt-5 space-y-4">
-            {submissions.map((submission) => (
-              <article className="panel p-5" key={submission.id}>
-                <div className="flex flex-wrap justify-between gap-2">
-                  <h3 className="font-bold">
-                    {forms.find((form) => form.id === submission.formId)
-                      ?.title ?? "Form response"}
-                  </h3>
-                  <time className="text-sm text-slate-500">
-                    {new Date(submission.submittedAt).toLocaleString()}
-                  </time>
-                </div>
-
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  
-{Object.entries(submission.answers).map(([id, answer]) => {
-  const question = forms
-    .find((form) => form.id === submission.formId)
-    ?.questions.find((question) => question.id === id);
-
-  const isFile = question?.type === "file";
-
-  return (
-    <div key={id} className="rounded-xl bg-slate-50 p-3">
-      <p className="text-xs text-slate-500">
-        {question?.label ?? "Answer"}
-      </p>
-
-      <p className="mt-1 break-words text-sm font-medium">
-        {isFile ? "Uploaded file" : answer}
-      </p>
-
-      
-{isFile && (
-  <button
-    type="button"
-    className="mt-2 text-sm font-semibold text-indigo-700 underline"
-    onClick={async () => {
-      try {
-        const response = await fetch(
-          `/api/file-access?path=${encodeURIComponent(answer)}`
-        );
-
-        const result = await response.json();
-
-        if (!response.ok || !result.url) {
-          alert(result.error ?? "Could not download this file.");
-          return;
-        }
-
-        window.open(result.url, "_blank", "noopener,noreferrer");
-      } catch {
-        alert("Could not download this file. Please try again.");
-      }
-    }}
-  >
-    Download uploaded file
-  </button>
-)}
-
-    </div>
-  );
-})}
-                </div>
-
-                
-                {submissions.length === 0 && (
-                  <div className="panel p-10 text-center text-slate-500">
-                    No submissions yet. Publish a form and share its link to
-                    collect responses.
+            {submissions.length === 0 ? (
+              <div className="panel p-10 text-center text-slate-500">
+                No submissions yet. Publish a form and share its link to collect responses.
+              </div>
+            ) : (
+              submissions.map((submission) => (
+                <article className="panel p-5" key={submission.id}>
+                  <div className="flex flex-wrap justify-between gap-2">
+                    <h3 className="font-bold">
+                      {forms.find((form) => form.id === submission.formId)?.title ??
+                        "Form response"}
+                    </h3>
+                    <time className="text-sm text-slate-500">
+                      {new Date(submission.submittedAt).toLocaleString()}
+                    </time>
                   </div>
-                )}
-              </article>
-            ))}
+                  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                    {Object.entries(submission.answers).map(([id, answer]) => {
+                      const question = forms
+                        .find((form) => form.id === submission.formId)
+                        ?.questions.find((item) => item.id === id);
+                      const isFile = question?.type === "file";
+                      return (
+                        <div key={id} className="rounded-xl bg-slate-50 p-3">
+                          <p className="text-xs text-slate-500">
+                            {question?.label ?? "Answer"}
+                          </p>
+                          <p className="mt-1 break-words text-sm font-medium">
+                            {isFile ? "Uploaded file" : answer}
+                          </p>
+                          {isFile && (
+                            <button
+                              type="button"
+                              className="mt-2 text-sm font-semibold text-indigo-700 underline"
+                              onClick={async () => {
+                                try {
+                                  const response = await fetch(
+                                    `/api/file-access?path=${encodeURIComponent(answer)}`,
+                                  );
+                                  const result = await response.json();
+                                  if (!response.ok || !result.url) {
+                                    alert(result.error ?? "Could not download this file.");
+                                    return;
+                                  }
+                                  window.open(result.url, "_blank", "noopener,noreferrer");
+                                } catch {
+                                  alert("Could not download this file. Please try again.");
+                                }
+                              }}
+                            >
+                              Download uploaded file
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </article>
+              ))
+            )}
           </div>
         )}
       </div>
-
 
       {editing && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8">
           <div className="mx-auto my-4 max-w-3xl rounded-2xl bg-white p-5 shadow-2xl sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-bold text-indigo-600">
-                  FORM BUILDER
-                </p>
+                <p className="text-sm font-bold text-indigo-600">FORM BUILDER</p>
                 <h2 className="mt-1 text-2xl font-black">
-                  {forms.some((form) => form.id === editing.id)
-                    ? "Edit form"
-                    : "Create a form"}
+                  {forms.some((form) => form.id === editing.id) ? "Edit form" : "Create a form"}
                 </h2>
               </div>
               <button
@@ -531,13 +661,10 @@ export default function Dashboard() {
                 <input
                   className="field mt-2 font-normal"
                   value={editing.title}
-                  onChange={(event) =>
-                    setEditing({ ...editing, title: event.target.value })
-                  }
+                  onChange={(event) => setEditing({ ...editing, title: event.target.value })}
                   required
                 />
               </label>
-
               <label className="text-sm font-bold">
                 Description
                 <textarea
@@ -545,66 +672,43 @@ export default function Dashboard() {
                   rows={2}
                   value={editing.description}
                   onChange={(event) =>
-                    setEditing({
-                      ...editing,
-                      description: event.target.value,
-                    })
+                    setEditing({ ...editing, description: event.target.value })
                   }
                 />
               </label>
-
               <label className="text-sm font-bold">
                 Welcome message
                 <input
                   className="field mt-2 font-normal"
                   value={editing.welcomeText}
-                  onChange={(event) =>
-                    setEditing({
-                      ...editing,
-                      welcomeText: event.target.value,
-                    })
-                  }
+                  onChange={(event) => setEditing({ ...editing, welcomeText: event.target.value })}
                 />
               </label>
-
               <label className="text-sm font-bold">
                 Completion message
                 <input
                   className="field mt-2 font-normal"
                   value={editing.completionText}
                   onChange={(event) =>
-                    setEditing({
-                      ...editing,
-                      completionText: event.target.value,
-                    })
+                    setEditing({ ...editing, completionText: event.target.value })
                   }
                 />
               </label>
-
               <label className="text-sm font-bold">
                 Accent color
                 <input
                   className="field mt-2 h-11 p-1"
                   type="color"
                   value={editing.accentColor}
-                  onChange={(event) =>
-                    setEditing({
-                      ...editing,
-                      accentColor: event.target.value,
-                    })
-                  }
+                  onChange={(event) => setEditing({ ...editing, accentColor: event.target.value })}
                 />
               </label>
-
               <label className="flex items-center gap-3 text-sm font-bold">
                 <input
                   type="checkbox"
                   checked={editing.published}
                   onChange={(event) =>
-                    setEditing({
-                      ...editing,
-                      published: event.target.checked,
-                    })
+                    setEditing({ ...editing, published: event.target.checked })
                   }
                 />
                 Publish form
@@ -617,10 +721,9 @@ export default function Dashboard() {
                 ＋ Add question
               </button>
             </div>
-
             <p className="mt-2 text-sm text-slate-500">
-              Conditional logic lets you show a question based on an answer to
-              another question. Configure a rule below each question.
+              Conditional logic lets you show a question based on an answer to another question.
+              Configure a rule below each question.
             </p>
 
             <div className="mt-4 space-y-4">
@@ -631,47 +734,32 @@ export default function Dashboard() {
                     (candidate.type === "yesno" ||
                       candidate.type === "choice" ||
                       candidate.type === "dropdown" ||
-                      candidate.type === "rating")
+                      candidate.type === "rating"),
                 );
-
                 const selectedTrigger = availableTriggers.find(
-                  (candidate) =>
-                    candidate.id === question.condition?.questionId
+                  (candidate) => candidate.id === question.condition?.questionId,
                 );
-
-                const triggerOptions = selectedTrigger
-                  ? getConditionOptions(selectedTrigger)
-                  : [];
+                const triggerOptions = selectedTrigger ? getConditionOptions(selectedTrigger) : [];
 
                 return (
-                  <div
-                    className="rounded-xl border border-slate-200 p-4"
-                    key={question.id}
-                  >
+                  <div className="rounded-xl border border-slate-200 p-4" key={question.id}>
                     <div className="flex items-start gap-3">
                       <span className="mt-3 text-sm font-black text-slate-400">
                         {String(index + 1).padStart(2, "0")}
                       </span>
-
                       <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_170px]">
                         <input
                           className="field"
                           value={question.label}
                           aria-label="Question label"
-                          onChange={(event) =>
-                            updateQuestion(index, {
-                              label: event.target.value,
-                            })
-                          }
+                          onChange={(event) => updateQuestion(index, { label: event.target.value })}
                         />
-
                         <select
                           className="field"
                           aria-label="Question type"
                           value={question.type}
                           onChange={(event) => {
                             const type = event.target.value as Question["type"];
-
                             updateQuestion(index, {
                               type,
                               options:
@@ -693,7 +781,6 @@ export default function Dashboard() {
                           <option value="file">File upload</option>
                         </select>
                       </div>
-
                       <button
                         className="px-2 py-2 text-rose-600"
                         onClick={() => deleteQuestion(question.id)}
@@ -703,8 +790,7 @@ export default function Dashboard() {
                       </button>
                     </div>
 
-                    {(question.type === "choice" ||
-                      question.type === "dropdown") && (
+                    {(question.type === "choice" || question.type === "dropdown") && (
                       <label className="mt-3 block pl-8 text-sm font-semibold">
                         Options (separate with commas)
                         <input
@@ -734,10 +820,8 @@ export default function Dashboard() {
                               setQuestionCondition(index, undefined);
                               return;
                             }
-
                             const trigger = availableTriggers[0];
                             const options = getConditionOptions(trigger);
-
                             setQuestionCondition(index, {
                               questionId: trigger.id,
                               operator: "equals",
@@ -750,8 +834,8 @@ export default function Dashboard() {
 
                       {availableTriggers.length === 0 && (
                         <p className="mt-2 text-xs text-slate-500">
-                          Add an earlier Yes / No, Multiple choice, Dropdown,
-                          or Rating question to use conditional logic here.
+                          Add an earlier Yes / No, Multiple choice, Dropdown, or Rating question
+                          to use conditional logic here.
                         </p>
                       )}
 
@@ -761,22 +845,16 @@ export default function Dashboard() {
                             When the answer to
                             <select
                               className="field mt-1 text-sm font-normal"
-                              value={
-                                selectedTrigger?.id ??
-                                question.condition.questionId
-                              }
+                              value={selectedTrigger?.id ?? question.condition.questionId}
                               onChange={(event) => {
                                 const trigger = availableTriggers.find(
-                                  (candidate) =>
-                                    candidate.id === event.target.value
+                                  (candidate) => candidate.id === event.target.value,
                                 );
                                 if (!trigger) return;
-
                                 const options = getConditionOptions(trigger);
                                 setQuestionCondition(index, {
                                   questionId: trigger.id,
-                                  operator:
-                                    question.condition?.operator ?? "equals",
+                                  operator: question.condition?.operator ?? "equals",
                                   value: options[0] ?? "",
                                 });
                               }}
@@ -788,7 +866,6 @@ export default function Dashboard() {
                               ))}
                             </select>
                           </label>
-
                           <label className="text-xs font-semibold text-slate-600">
                             Comparison
                             <select
@@ -797,9 +874,7 @@ export default function Dashboard() {
                               onChange={(event) =>
                                 setQuestionCondition(index, {
                                   ...question.condition!,
-                                  operator: event.target.value as
-                                    | "equals"
-                                    | "not_equals",
+                                  operator: event.target.value as "equals" | "not_equals",
                                 })
                               }
                             >
@@ -807,7 +882,6 @@ export default function Dashboard() {
                               <option value="not_equals">Does not equal</option>
                             </select>
                           </label>
-
                           <label className="text-xs font-semibold text-slate-600">
                             This answer
                             {triggerOptions.length > 0 ? (
@@ -822,9 +896,7 @@ export default function Dashboard() {
                                 }
                               >
                                 {triggerOptions.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
+                                  <option key={option} value={option}>{option}</option>
                                 ))}
                               </select>
                             ) : (
@@ -849,14 +921,11 @@ export default function Dashboard() {
                         type="checkbox"
                         checked={question.required}
                         onChange={(event) =>
-                          updateQuestion(index, {
-                            required: event.target.checked,
-                          })
+                          updateQuestion(index, { required: event.target.checked })
                         }
                       />
                       Required question
                     </label>
-
                     <div className="mt-3 flex gap-2 pl-8">
                       <button
                         className="text-xs font-bold text-indigo-700 disabled:text-slate-300"
@@ -879,10 +948,7 @@ export default function Dashboard() {
             </div>
 
             <div className="mt-7 flex flex-wrap justify-end gap-3 border-t pt-5">
-              <button
-                className="btn btn-light"
-                onClick={() => setEditing(null)}
-              >
+              <button className="btn btn-light" onClick={() => setEditing(null)}>
                 Cancel
               </button>
               <button className="btn btn-primary" onClick={() => void save()}>
@@ -895,6 +961,7 @@ export default function Dashboard() {
     </main>
   );
 }
+
 function Stat({ label, value }: { label: string; value: number }) {
   return (
     <div className="panel p-5">
