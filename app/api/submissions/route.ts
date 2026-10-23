@@ -1,3 +1,177 @@
+import { Resend } from "resend";
+import { createClient } from "@supabase/supabase-js";
+
+async function notifyNewSubmission(
+  formId: string,
+  submissionId: string,
+  formTitle: string,
+  answers: Record<string, string>
+) {
+  const destination = process.env.FORM_NOTIFICATION_EMAIL;
+  const apiKey = process.env.RESEND_API_KEY;
+  const from = process.env.RESEND_FROM_EMAIL;
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!destination || !apiKey || !from || !supabaseUrl || !serviceKey) {
+    console.error("Email notification settings are incomplete.");
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+  let deliveryId: string | undefined;
+
+  try {
+    const { data, error } = await supabase
+      .from("integration_deliveries")
+      .insert({
+        form_id: formId,
+        submission_id: submissionId,
+        integration_type: "email",
+        destination,
+        status: "pending",
+        attempts: 0,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    deliveryId = data.id;
+
+    const resend = new Resend(apiKey);
+    const emailText = Object.entries(answers)
+      .map(([questionId, answer]) => `${questionId}: ${answer}`)
+      .join("\n");
+
+    const { error: emailError } = await resend.emails.send({
+      from,
+      to: [destination],
+      subject: `New response: ${formTitle}`,
+      text: `A new form submission was received.\n\nForm: ${formTitle}\nSubmission ID: ${submissionId}\n\nAnswers:\n${emailText}`,
+    });
+
+    if (emailError) throw new Error(emailError.message);
+
+    const { error: updateError } = await supabase
+      .from("integration_deliveries")
+      .update({
+        status: "success",
+        attempts: 1,
+        delivered_at: new Date().toISOString(),
+      })
+      .eq("id", deliveryId);
+
+    if (updateError) {
+      console.error("Email sent, but delivery status update failed:", updateError);
+    }
+  } catch (error) {
+    console.error("Email notification failed:", error);
+
+    if (deliveryId) {
+      const { error: logError } = await supabase
+        .from("integration_deliveries")
+        .update({
+          status: "failed",
+          attempts: 1,
+          last_error:
+            error instanceof Error ? error.message : "Unknown delivery error",
+        })
+        .eq("id", deliveryId);
+
+      if (logError) console.error("Could not update delivery log:", logError);
+    }
+  }
+}
+
+async function recordWebhookDelivery(
+  formId: string,
+  submissionId: string,
+  destination: string,
+  answers: Record<string, string>
+) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!supabaseUrl || !serviceKey) {
+    console.error("Webhook delivery: Supabase settings are missing.");
+    return;
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+  let deliveryId: string | undefined;
+
+  try {
+    // Only allow a configured HTTPS destination.
+    const url = new URL(destination);
+    if (url.protocol !== "https:") {
+      throw new Error("Webhook destination must use HTTPS.");
+    }
+
+    const { data, error } = await supabase
+      .from("integration_deliveries")
+      .insert({
+        form_id: formId,
+        submission_id: submissionId,
+        integration_type: "webhook",
+        destination,
+        status: "pending",
+        attempts: 0,
+      })
+      .select("id")
+      .single();
+
+    if (error) throw error;
+    deliveryId = data.id;
+
+    const response = await fetch(url.toString(), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        event: "form.submission.created",
+        formId,
+        submissionId,
+        answers,
+      }),
+      signal: AbortSignal.timeout(10000),
+      cache: "no-store",
+    });
+
+    if (!response.ok) {
+      throw new Error(`Webhook returned HTTP ${response.status}`);
+    }
+
+    const { error: updateError } = await supabase
+      .from("integration_deliveries")
+      .update({
+        status: "success",
+        attempts: 1,
+        delivered_at: new Date().toISOString(),
+      })
+      .eq("id", deliveryId);
+
+    if (updateError) {
+      console.error("Webhook sent, but logging its status failed:", updateError);
+    }
+  } catch (error) {
+    console.error("Webhook delivery failed:", error);
+
+    if (deliveryId) {
+      const { error: logError } = await supabase
+        .from("integration_deliveries")
+        .update({
+          status: "failed",
+          attempts: 1,
+          last_error:
+            error instanceof Error ? error.message : "Unknown webhook error",
+        })
+        .eq("id", deliveryId);
+
+      if (logError) {
+        console.error("Could not update webhook delivery log:", logError);
+      }
+    }
+  }
+}
 
 import { NextResponse } from "next/server";
 import {
@@ -242,7 +416,22 @@ export async function POST(request: Request) {
     };
 
     await saveSubmission(submission);
+    const webhookUrl = process.env.FORM_WEBHOOK_URL;
 
+if (webhookUrl) {
+  await recordWebhookDelivery(
+    form.id,
+    submission.id,
+    webhookUrl,
+    visibleAnswers
+  );
+}
+await notifyNewSubmission(
+  form.id,
+  submission.id,
+  form.title,
+  visibleAnswers
+);
     return NextResponse.json(
       { ok: true, submissionId: submission.id },
       { status: 201 }

@@ -3,7 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { FormRecord, Question } from "@/lib/types";
+function getAnalyticsSessionId() {
+  const key = "formly-analytics-session";
 
+  try {
+    let sessionId = sessionStorage.getItem(key);
+
+    if (!sessionId) {
+      sessionId = crypto.randomUUID();
+      sessionStorage.setItem(key, sessionId);
+    }
+
+    return sessionId;
+  } catch {
+    return crypto.randomUUID();
+  }
+}
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ALLOWED_FILE_TYPES = new Set([
   "image/jpeg",
@@ -27,7 +42,19 @@ export default function PublicForm({
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+useEffect(() => {
+  const sessionId = getAnalyticsSessionId();
 
+  void fetch("/api/analytics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      formId: form.id,
+      eventType: "view",
+      sessionId,
+    }),
+  }).catch(() => {});
+}, [form.id]);
   const visibleQuestions = useMemo(() => {
     const visible: Question[] = [];
     const visibleIds = new Set<string>();
@@ -219,7 +246,17 @@ export default function PublicForm({
         setError(result.error || "Could not submit your response.");
         return;
       }
+const sessionId = getAnalyticsSessionId();
 
+void fetch("/api/analytics", {
+  method: "POST",
+  headers: { "Content-Type": "application/json" },
+  body: JSON.stringify({
+    formId: form.id,
+    eventType: "completion",
+    sessionId,
+  }),
+}).catch(() => {});
       setDone(true);
     } catch {
       setError("A connection error occurred. Please try again.");
@@ -300,9 +337,21 @@ export default function PublicForm({
                     className="btn btn-primary mt-6"
                     style={{ background: form.accentColor }}
                     onClick={() => {
-                      setStep(0);
-                      setError("");
-                    }}
+  const sessionId = getAnalyticsSessionId();
+
+  void fetch("/api/analytics", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      formId: form.id,
+      eventType: "start",
+      sessionId,
+    }),
+  }).catch(() => {});
+
+  setStep(0);
+  setError("");
+}}
                   >
                     Start →
                   </button>
