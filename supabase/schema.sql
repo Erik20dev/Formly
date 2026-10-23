@@ -39,3 +39,32 @@ ON public.form_analytics_events (form_id, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_form_analytics_events_type
 ON public.form_analytics_events (event_type);
+
+-- Track email and webhook delivery attempts.
+CREATE TABLE IF NOT EXISTS public.integration_deliveries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  form_id UUID REFERENCES public.forms(id) ON DELETE SET NULL,
+  submission_id UUID REFERENCES public.submissions(id) ON DELETE SET NULL,
+  integration_type TEXT NOT NULL
+    CHECK (integration_type IN ('email', 'webhook')),
+  destination TEXT NOT NULL,
+  status TEXT NOT NULL
+    CHECK (status IN ('pending', 'success', 'failed')),
+  attempts INTEGER NOT NULL DEFAULT 0
+    CHECK (attempts >= 0),
+  last_error TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  delivered_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS integration_deliveries_form_id_idx
+  ON public.integration_deliveries (form_id);
+
+CREATE INDEX IF NOT EXISTS integration_deliveries_submission_id_idx
+  ON public.integration_deliveries (submission_id);
+
+CREATE INDEX IF NOT EXISTS integration_deliveries_status_idx
+  ON public.integration_deliveries (status);
+
+CREATE INDEX IF NOT EXISTS integration_deliveries_created_at_idx
+  ON public.integration_deliveries (created_at DESC);
