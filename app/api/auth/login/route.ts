@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { timingSafeEqual } from "node:crypto";
 import { createAdminSession } from "@/lib/auth";
+import { checkLoginRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -13,6 +14,31 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Admin login is not configured." },
         { status: 500 }
+      );
+    }
+
+    const ip = request.headers.get("x-real-ip")?.trim();
+
+    if (!ip) {
+      return NextResponse.json(
+        { error: "Unable to verify login request." },
+        { status: 400 }
+      );
+    }
+
+    const { success, reset } = await checkLoginRateLimit(ip);
+
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many login attempts. Please try again shortly." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              Math.max(1, Math.ceil((reset - Date.now()) / 1000))
+            ),
+          },
+        }
       );
     }
 
@@ -43,7 +69,9 @@ export async function POST(request: Request) {
     await createAdminSession();
 
     return NextResponse.json({ ok: true });
-  } catch {
+  } catch (error) {
+    console.error("Admin login failed:", error);
+
     return NextResponse.json(
       { error: "Unable to log in right now." },
       { status: 500 }

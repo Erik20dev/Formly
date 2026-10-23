@@ -1,4 +1,4 @@
-
+import "server-only";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import type { FormRecord, Question, Submission } from "./types";
 
