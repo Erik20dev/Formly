@@ -9,14 +9,36 @@ function getLoginLimiter(): Ratelimit {
     return loginLimiter;
   }
 
-  const url = process.env.UPSTASH_REDIS_REST_URL;
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN;
+  const rawUrl = process.env.UPSTASH_REDIS_REST_URL
+    ?.trim()
+    .replace(/^["']+|["']+$/g, "");
 
-  if (!url || !token) {
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  if (!rawUrl || !token) {
     throw new Error("Upstash rate limiting is not configured.");
   }
 
-  const redis = new Redis({ url, token });
+  // Handle an accidentally saved Markdown link.
+  const markdownMatch = rawUrl.match(
+    /^\[([^\]]+)\]\((https:\/\/[^)]+)\)$/
+  );
+
+  const url = markdownMatch ? markdownMatch[2] : rawUrl;
+
+  let parsedUrl: URL;
+
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    throw new Error("Upstash Redis REST URL is invalid.");
+  }
+
+  if (parsedUrl.protocol !== "https:") {
+    throw new Error("Upstash Redis REST URL must use HTTPS.");
+  }
+
+  const redis = new Redis({ url: parsedUrl.toString(), token });
 
   loginLimiter = new Ratelimit({
     redis,
