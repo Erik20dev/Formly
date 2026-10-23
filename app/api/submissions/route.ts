@@ -199,13 +199,10 @@ export async function GET(request: Request) {
       )
     );
   } catch (error) {
+    console.error("Submission processing failed:", error);
+
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Server error.",
-      },
+      { error: "Unable to process your submission. Please try again." },
       { status: 500 }
     );
   }
