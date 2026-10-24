@@ -13,7 +13,9 @@ function getLoginLimiter(): Ratelimit {
     ?.trim()
     .replace(/^["']+|["']+$/g, "");
 
-  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN
+  ?.trim()
+  .replace(/^["']+|["']+$/g, "");
 
   if (!rawUrl || !token) {
     throw new Error("Upstash rate limiting is not configured.");
