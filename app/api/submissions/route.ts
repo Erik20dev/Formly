@@ -1,6 +1,6 @@
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
-
+import { validateWebhookUrl } from "../../../lib/webhook-security";
 async function notifyNewSubmission(
   formId: string,
   submissionId: string,
@@ -101,11 +101,7 @@ async function recordWebhookDelivery(
   let deliveryId: string | undefined;
 
   try {
-    // Only allow a configured HTTPS destination.
-    const url = new URL(destination);
-    if (url.protocol !== "https:") {
-      throw new Error("Webhook destination must use HTTPS.");
-    }
+    const url = validateWebhookUrl(destination);
 
     const { data, error } = await supabase
       .from("integration_deliveries")
@@ -123,8 +119,9 @@ async function recordWebhookDelivery(
     if (error) throw error;
     deliveryId = data.id;
 
-    const response = await fetch(url.toString(), {
+        const response = await fetch(url.toString(), {
       method: "POST",
+      redirect: "error",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         event: "form.submission.created",
@@ -135,7 +132,6 @@ async function recordWebhookDelivery(
       signal: AbortSignal.timeout(10000),
       cache: "no-store",
     });
-
     if (!response.ok) {
       throw new Error(`Webhook returned HTTP ${response.status}`);
     }

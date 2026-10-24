@@ -37,7 +37,13 @@ function getLoginLimiter(): Ratelimit {
   if (parsedUrl.protocol !== "https:") {
     throw new Error("Upstash Redis REST URL must use HTTPS.");
   }
-
+console.info("[Formly Redis diagnostic]", {
+  host: parsedUrl.hostname,
+  tokenLength: token.length,
+  tokenHasQuotes: token.startsWith('"') || token.startsWith("'") ||
+    token.endsWith('"') || token.endsWith("'"),
+  tokenLooksLikeUrl: token.startsWith("http"),
+});
   const redis = new Redis({ url: parsedUrl.toString(), token });
 
   loginLimiter = new Ratelimit({
