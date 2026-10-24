@@ -2,11 +2,43 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getForm } from "@/lib/store";
 import { isAdminAuthenticated } from "@/lib/auth";
-
+import { checkPublicRateLimit } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-real-ip")?.trim();
+
+    if (!ip) {
+      return NextResponse.json(
+        { error: "Unable to verify your request. Please try again." },
+        { status: 400 },
+      );
+    }
+
+    let rateLimit: Awaited<ReturnType<typeof checkPublicRateLimit>>;
+
+    try {
+      rateLimit = await checkPublicRateLimit(`analytics:${ip}`);
+    } catch (error) {
+      console.error("Analytics rate limiter unavailable:", error);
+
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 },
+      );
+    }
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "Too many analytics events. Please try again later." },
+        {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        },
+      );
+    }
+
     const body = await request.json();
 
     if (

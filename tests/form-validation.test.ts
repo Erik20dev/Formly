@@ -1,12 +1,17 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { getFormMock, saveSubmissionMock, isAdminAuthenticatedMock } =
-  vi.hoisted(() => ({
-    getFormMock: vi.fn(),
-    saveSubmissionMock: vi.fn(),
-    isAdminAuthenticatedMock: vi.fn(),
-  }));
+const {
+  getFormMock,
+  saveSubmissionMock,
+  isAdminAuthenticatedMock,
+  checkPublicRateLimitMock,
+} = vi.hoisted(() => ({
+  getFormMock: vi.fn(),
+  saveSubmissionMock: vi.fn(),
+  isAdminAuthenticatedMock: vi.fn(),
+  checkPublicRateLimitMock: vi.fn(),
+}));
 
 vi.mock("@/lib/store", () => ({
   getForm: getFormMock,
@@ -17,7 +22,9 @@ vi.mock("@/lib/store", () => ({
 vi.mock("@/lib/auth", () => ({
   isAdminAuthenticated: isAdminAuthenticatedMock,
 }));
-
+vi.mock("@/lib/rate-limit", () => ({
+  checkPublicRateLimit: checkPublicRateLimitMock,
+}));
 import { POST } from "../app/api/submissions/route";
 
 const publishedForm = {
@@ -53,14 +60,17 @@ const publishedForm = {
 function request(body: unknown) {
   return new Request("http://localhost/api/submissions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-real-ip": "203.0.113.10",
+    },
     body: JSON.stringify(body),
   });
 }
-
 describe("POST /api/submissions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    checkPublicRateLimitMock.mockResolvedValue({ success: true });
     getFormMock.mockResolvedValue(publishedForm);
     saveSubmissionMock.mockResolvedValue(undefined);
   });

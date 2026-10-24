@@ -2,10 +2,12 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getForm } from "@/lib/store";
+import { checkUploadRateLimit } from "@/lib/rate-limit";
 
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
 const ALLOWED_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -17,6 +19,42 @@ const ALLOWED_TYPES = new Set([
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-real-ip")?.trim();
+
+    if (!ip) {
+      return NextResponse.json(
+        { error: "Unable to verify upload request." },
+        { status: 400 }
+      );
+    }
+
+    let rateLimit: Awaited<ReturnType<typeof checkUploadRateLimit>>;
+
+    try {
+      rateLimit = await checkUploadRateLimit(ip);
+    } catch (error) {
+      console.error("Upload rate limiter unavailable:", error);
+
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "Too many uploads. Please wait before trying again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": String(
+              Math.max(1, Math.ceil((rateLimit.reset - Date.now()) / 1000))
+            ),
+          },
+        }
+      );
+    }
+
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
@@ -35,7 +73,9 @@ export async function POST(request: Request) {
     if (
       !(file instanceof File) ||
       typeof formId !== "string" ||
-      typeof questionId !== "string"
+      typeof questionId !== "string" ||
+      !formId.trim() ||
+      !questionId.trim()
     ) {
       return NextResponse.json(
         { error: "A file, form ID, and question ID are required." },
@@ -94,6 +134,7 @@ export async function POST(request: Request) {
 
     if (error) {
       console.error("Upload failed:", error);
+
       return NextResponse.json(
         { error: "The file could not be uploaded." },
         { status: 500 }
@@ -111,6 +152,7 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Upload request failed:", error);
+
     return NextResponse.json(
       { error: "The upload request could not be processed." },
       { status: 500 }

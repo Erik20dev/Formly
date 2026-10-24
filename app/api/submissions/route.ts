@@ -177,7 +177,7 @@ import {
 } from "@/lib/store";
 import { isAdminAuthenticated } from "@/lib/auth";
 import type { Question, Submission } from "@/lib/types";
-
+import { checkPublicRateLimit } from "@/lib/rate-limit";
 export async function GET(request: Request) {
   if (!(await isAdminAuthenticated())) {
     return NextResponse.json(
@@ -241,6 +241,40 @@ function getVisibleQuestions(
 
 export async function POST(request: Request) {
   try {
+    const ip = request.headers.get("x-real-ip")?.trim();
+
+    if (!ip) {
+      return NextResponse.json(
+        { error: "Unable to verify your request. Please try again." },
+        { status: 400 }
+      );
+    }
+
+    let rateLimit: Awaited<ReturnType<typeof checkPublicRateLimit>>;
+
+    try {
+      rateLimit = await checkPublicRateLimit(`submission:${ip}`);
+    } catch (error) {
+      console.error("Submission rate limiter unavailable:", error);
+
+      return NextResponse.json(
+        { error: "Service temporarily unavailable. Please try again later." },
+        { status: 503 }
+      );
+    }
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: "Too many submissions. Please wait a minute and try again." },
+        {
+          status: 429,
+          headers: {
+            "Retry-After": "60",
+          },
+        }
+      );
+    }
+
     const body = await request.json();
 
     if (
@@ -429,14 +463,11 @@ await notifyNewSubmission(
       { ok: true, submissionId: submission.id },
       { status: 201 }
     );
-  } catch (error) {
+    } catch (error) {
+    console.error("Submission processing failed:", error);
+
     return NextResponse.json(
-      {
-        error:
-          error instanceof Error
-            ? error.message
-            : "Server error.",
-      },
+      { error: "Unable to process your submission. Please try again." },
       { status: 500 }
     );
   }
