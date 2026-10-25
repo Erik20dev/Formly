@@ -19,7 +19,9 @@ const ALLOWED_TYPES = new Set([
 
 export async function POST(request: Request) {
   try {
-    const ip = request.headers.get("x-real-ip")?.trim();
+    const ip =
+  request.headers.get("x-real-ip")?.trim() ||
+  request.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
 
     if (!ip) {
       return NextResponse.json(
