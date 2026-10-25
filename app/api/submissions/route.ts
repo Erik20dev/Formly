@@ -241,7 +241,12 @@ function getVisibleQuestions(
 
 export async function POST(request: Request) {
   try {
-    const ip = request.headers.get("x-real-ip")?.trim();
+        const forwardedFor = request.headers.get("x-forwarded-for");
+    const ip =
+      request.headers.get("x-real-ip")?.trim() ||
+      forwardedFor?.split(",")[0]?.trim() ||
+      (process.env.NODE_ENV === "development" ? "127.0.0.1" : "");
+
 
     if (!ip) {
       return NextResponse.json(

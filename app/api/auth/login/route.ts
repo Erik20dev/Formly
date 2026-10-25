@@ -16,8 +16,10 @@ export async function POST(request: Request) {
         { status: 500 }
       );
     }
-
-    const ip = request.headers.get("x-real-ip")?.trim();
+     const requestIp = request.headers.get("x-real-ip")?.trim();
+    const ip =
+      requestIp ||
+      (process.env.NODE_ENV === "development" ? "127.0.0.1" : "");
 
     if (!ip) {
       return NextResponse.json(

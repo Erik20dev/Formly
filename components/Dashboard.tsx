@@ -9,13 +9,14 @@ import type {
   Submission,
 } from "@/lib/types";
 import { getFormAnalytics } from "@/lib/analytics";
-
+const DRAFT_STORAGE_KEY = "formly-editor-draft";
 type AnalyticsEvent = {
   form_id: string;
   event_type: "view" | "start" | "completion";
   session_id: string;
   created_at: string;
 };
+
 
 const emptyForm = (): FormRecord => ({
   id: crypto.randomUUID(),
@@ -35,6 +36,140 @@ const emptyForm = (): FormRecord => ({
   ],
   createdAt: new Date().toISOString(),
 });
+
+const FORM_TEMPLATES: {
+  name: string;
+  description: string;
+  title: string;
+  formDescription: string;
+  welcomeText: string;
+  completionText: string;
+  questions: {
+    label: string;
+    type: Question["type"];
+    required: boolean;
+    options?: string[];
+  }[];
+}[] = [
+  {
+    name: "Contact form",
+    description: "Collect contact details and enquiries.",
+    title: "Contact us",
+    formDescription: "Send our team a message.",
+    welcomeText: "How can we help you?",
+    completionText: "Thanks for contacting us!",
+    questions: [
+      { label: "Your name", type: "text", required: true },
+      { label: "Your email", type: "email", required: true },
+      {
+        label: "What can we help you with?",
+        type: "dropdown",
+        required: true,
+        options: ["General enquiry", "Support", "Partnership"],
+      },
+      { label: "Your message", type: "text", required: true },
+    ],
+  },
+  {
+    name: "Customer feedback",
+    description: "Understand customer satisfaction.",
+    title: "Customer feedback",
+    formDescription: "Tell us about your experience.",
+    welcomeText: "We value your feedback.",
+    completionText: "Thank you for helping us improve!",
+    questions: [
+      {
+        label: "How would you rate your experience?",
+        type: "rating",
+        required: true,
+      },
+      {
+        label: "What did you like most?",
+        type: "text",
+        required: false,
+      },
+      {
+        label: "Would you recommend us?",
+        type: "yesno",
+        required: true,
+      },
+      {
+        label: "What could we improve?",
+        type: "text",
+        required: false,
+      },
+    ],
+  },
+  {
+    name: "Event registration",
+    description: "Register attendees for an event.",
+    title: "Event registration",
+    formDescription: "Register your interest in our event.",
+    welcomeText: "Join our upcoming event!",
+    completionText: "Your registration has been received.",
+    questions: [
+      { label: "Full name", type: "text", required: true },
+      { label: "Email address", type: "email", required: true },
+      {
+        label: "Which session will you attend?",
+        type: "dropdown",
+        required: true,
+        options: ["Morning", "Afternoon", "Full day"],
+      },
+      {
+        label: "Registration date",
+        type: "date",
+        required: true,
+      },
+    ],
+  },
+  {
+    name: "Job application",
+    description: "Collect candidate details and applications.",
+    title: "Job application",
+    formDescription: "Apply to join our team.",
+    welcomeText: "Tell us about yourself.",
+    completionText: "Thank you for applying!",
+    questions: [
+      { label: "Full name", type: "text", required: true },
+      { label: "Email address", type: "email", required: true },
+      {
+        label: "Position you are applying for",
+        type: "text",
+        required: true,
+      },
+      {
+        label: "Available start date",
+        type: "date",
+        required: true,
+      },
+      {
+        label: "Upload your CV",
+        type: "file",
+        required: true,
+      },
+    ],
+  },
+];
+
+function createFormFromTemplate(
+  template: (typeof FORM_TEMPLATES)[number]
+): FormRecord {
+  return {
+    id: crypto.randomUUID(),
+    title: template.title,
+    description: template.formDescription,
+    published: false,
+    welcomeText: template.welcomeText,
+    completionText: template.completionText,
+    accentColor: "#4f46e5",
+    createdAt: new Date().toISOString(),
+    questions: template.questions.map((question) => ({
+      ...question,
+      id: crypto.randomUUID(),
+    })),
+  };
+}
 
 function defaultOptions(type: Question["type"]): string[] | undefined {
   return type === "choice" || type === "dropdown"
@@ -61,7 +196,61 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"forms" | "responses">("forms");
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(true);
+  const [showTemplateGallery, setShowTemplateGallery] = useState(false);
+  const [formSearch, setFormSearch] = useState("");
+const [formFilter, setFormFilter] = useState("all");
+  // Recover an unfinished form draft when the dashboard opens.
+  useEffect(() => {
+    const savedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
 
+    if (!savedDraft) return;
+
+    try {
+      const parsed = JSON.parse(savedDraft) as {
+        form?: FormRecord;
+        savedAt?: string;
+      };
+
+      if (!parsed.form || typeof parsed.form.id !== "string") {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+        return;
+      }
+
+      const recover = window.confirm(
+        `Recover your unfinished draft "${parsed.form.title}"?`
+      );
+
+      if (recover) {
+        setEditing(parsed.form);
+        setMessage("Unfinished draft recovered.");
+      } else {
+        window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+      }
+    } catch {
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+    }
+  }, []);
+
+  // Automatically save editor changes in this browser.
+  useEffect(() => {
+    if (!editing) return;
+
+    const timeoutId = window.setTimeout(() => {
+      try {
+        window.localStorage.setItem(
+          DRAFT_STORAGE_KEY,
+          JSON.stringify({
+            form: editing,
+            savedAt: new Date().toISOString(),
+          })
+        );
+      } catch {
+        setMessage("Could not save a local draft in this browser.");
+      }
+    }, 700);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [editing]);
   const analytics = getFormAnalytics(
     forms,
     submissions,
@@ -104,7 +293,6 @@ export default function Dashboard() {
   useEffect(() => {
     void refresh();
   }, []);
-
   async function save() {
     if (!editing) return;
 
@@ -131,7 +319,10 @@ export default function Dashboard() {
       return;
     }
 
-    const questionIds = new Set(editing.questions.map((question) => question.id));
+    const questionIds = new Set(
+      editing.questions.map((question) => question.id),
+    );
+
     if (
       editing.questions.some(
         (question) =>
@@ -152,6 +343,7 @@ export default function Dashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(editing),
       });
+
       const result = await response.json();
 
       if (!response.ok) {
@@ -159,28 +351,95 @@ export default function Dashboard() {
         return;
       }
 
-      setEditing(null);
-      setMessage("Form saved successfully.");
+      window.localStorage.removeItem(DRAFT_STORAGE_KEY);
+setEditing(null);
+setMessage("Form saved successfully.");
       await refresh();
     } catch {
       setMessage("Could not save form. Please check your connection.");
     }
   }
+async function remove(formId: string) {
+  const confirmed = window.confirm(
+    "Are you sure you want to delete this form? All saved submissions for this form will also be permanently deleted."
+  );
 
-  async function remove(id: string) {
-    if (!confirm("Delete this form and its saved responses?")) return;
+  if (!confirmed) return;
+
+  try {
+    const response = await fetch(`/api/forms/${formId}`, {
+      method: "DELETE",
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      setMessage(result.error || "Could not delete form.");
+      return;
+    }
+
+    if (editing?.id === formId) {
+      setEditing(null);
+    }
+
+    setMessage("Form deleted successfully.");
+    await refresh();
+  } catch {
+    setMessage("Could not delete form. Please check your connection.");
+  }
+}
+  async function duplicateForm(form: FormRecord) {
+    const questionIdMap = new Map(
+      form.questions.map((question) => [
+        question.id,
+        crypto.randomUUID(),
+      ]),
+    );
+
+    const duplicate: FormRecord = {
+      ...form,
+      id: crypto.randomUUID(),
+      title: `${form.title} (Copy)`,
+      published: false,
+      createdAt: new Date().toISOString(),
+      questions: form.questions.map((question) => ({
+        ...question,
+        id: questionIdMap.get(question.id)!,
+        options: question.options ? [...question.options] : undefined,
+        condition:
+          question.condition &&
+          questionIdMap.has(question.condition.questionId)
+            ? {
+                ...question.condition,
+                questionId: questionIdMap.get(
+                  question.condition.questionId,
+                )!,
+              }
+            : undefined,
+      })),
+    };
+
     try {
-      const response = await fetch(`/api/forms/${id}`, { method: "DELETE" });
+      const response = await fetch("/api/forms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(duplicate),
+      });
+
+      const result = await response.json();
+
       if (!response.ok) {
-        setMessage("Could not delete form.");
+        setMessage(result.error || "Could not duplicate form.");
         return;
       }
-      setMessage("Form deleted.");
+
+      setMessage("Form duplicated successfully as a draft.");
       await refresh();
     } catch {
-      setMessage("Could not delete form. Please check your connection.");
+      setMessage("Could not duplicate form. Please check your connection.");
     }
   }
+
 
   async function copy(text: string) {
     try {
@@ -319,15 +578,104 @@ export default function Dashboard() {
               Create forms, publish them and manage responses.
             </p>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              setEditing(emptyForm());
-              setMessage("");
-            }}
-          >
-            ＋ Create form
-          </button>
+
+         
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              className="btn btn-light"
+              onClick={() => setShowTemplateGallery(true)}
+            >
+              ✦ Browse templates
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setEditing(emptyForm());
+                setMessage("");
+              }}
+            >
+              ＋ Create form
+            </button>
+
+            {showTemplateGallery && (
+              <div
+                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+                onClick={() => setShowTemplateGallery(false)}
+              >
+                <section
+                  role="dialog"
+                  aria-modal="true"
+                  aria-labelledby="template-gallery-title"
+                  className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+                  onClick={(event) => event.stopPropagation()}
+                >
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <h2
+                        id="template-gallery-title"
+                        className="text-2xl font-black"
+                      >
+                        Start with a template
+                      </h2>
+                      <p className="mt-2 text-sm text-slate-500">
+                        Choose a starting point, then customize it in the form
+                        editor.
+                      </p>
+                    </div>
+
+                    <button
+                      type="button"
+                      aria-label="Close template gallery"
+                      className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+                      onClick={() => setShowTemplateGallery(false)}
+                    >
+                      Close
+                    </button>
+                  </div>
+
+                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                    {FORM_TEMPLATES.map((template, index) => (
+                      <button
+                        key={template.name}
+                        type="button"
+                        className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-indigo-400 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        onClick={() => {
+                          setEditing(createFormFromTemplate(template));
+                          setMessage(
+                            `${template.name} template opened as a new draft.`
+                          );
+                          setShowTemplateGallery(false);
+                        }}
+                      >
+                        <span className="text-sm font-bold text-indigo-600">
+                          TEMPLATE {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <h3 className="mt-2 text-lg font-bold">
+                          {template.name}
+                        </h3>
+                        <p className="mt-2 text-sm leading-6 text-slate-600">
+                          {template.description}
+                        </p>
+                        <p className="mt-4 text-xs font-semibold text-slate-500">
+                          {template.questions.length} questions · Unpublished
+                          draft
+                        </p>
+                        <span className="mt-4 inline-block text-sm font-bold text-indigo-700">
+                          Use this template →
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </section>
+              </div>
+            )}
+          </div>
+
+          </div>
+
         </div>
 
         {message && (
@@ -477,91 +825,177 @@ export default function Dashboard() {
           </button>
         </div>
 
+        
         {loading ? (
           <p className="py-12 text-slate-500">Loading workspace…</p>
         ) : activeTab === "forms" ? (
           <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {forms.map((form) => (
-              <article className="panel p-5" key={form.id}>
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="text-lg font-bold">{form.title}</h2>
-                    <p className="mt-1 text-sm text-slate-500">
-                      {form.questions.length} questions ·{" "}
-                      {submissions.filter((submission) => submission.formId === form.id).length}{" "}
-                      responses
-                    </p>
+            <div className="col-span-full flex flex-col gap-3 sm:flex-row">
+              <input
+                type="search"
+                value={formSearch}
+                onChange={(event) => setFormSearch(event.target.value)}
+                placeholder="Search forms by title or description..."
+                aria-label="Search forms"
+                className="w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm"
+              />
+
+              <select
+                value={formFilter}
+                onChange={(event) => setFormFilter(event.target.value)}
+                aria-label="Filter forms by status"
+                className="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm sm:min-w-44"
+              >
+                <option value="all">All forms</option>
+                <option value="published">Published forms</option>
+                <option value="draft">Drafts only</option>
+              </select>
+            </div>
+
+            {forms
+              .filter((form) => {
+                const search = formSearch.trim().toLowerCase();
+                const matchesSearch =
+                  form.title.toLowerCase().includes(search) ||
+                  (form.description ?? "").toLowerCase().includes(search);
+
+                const matchesFilter =
+                  formFilter === "all" ||
+                  (formFilter === "published" && form.published) ||
+                  (formFilter === "draft" && !form.published);
+
+                return matchesSearch && matchesFilter;
+              })
+              .map((form) => (
+                <article className="panel p-5" key={form.id}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h2 className="text-lg font-bold">{form.title}</h2>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {form.questions.length} questions ·{" "}
+                        {
+                          submissions.filter(
+                            (submission) => submission.formId === form.id
+                          ).length
+                        }{" "}
+                        responses
+                      </p>
+                    </div>
+
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-bold ${
+                        form.published
+                          ? "bg-emerald-100 text-emerald-700"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {form.published ? "Published" : "Draft"}
+                    </span>
                   </div>
-                  <span
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${
-                      form.published
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {form.published ? "Published" : "Draft"}
-                  </span>
-                </div>
-                <p className="mt-4 line-clamp-2 min-h-10 text-sm text-slate-600">
-                  {form.description || "No description added yet."}
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2">
-                  <button
-                    className="btn btn-light text-sm"
-                    onClick={() =>
-                      setEditing({
-                        ...form,
-                        questions: form.questions.map((question) => ({
-                          ...question,
-                          options: question.options ? [...question.options] : undefined,
-                          condition: question.condition ? { ...question.condition } : undefined,
-                        })),
-                      })
-                    }
-                  >
-                    Edit
-                  </button>
-                  <button
-                    className="btn btn-light text-sm"
-                    onClick={() => void copy(`${appUrl}/forms/${form.id}`)}
-                  >
-                    Copy public link
-                  </button>
-                  <button
-                    className="btn btn-light text-sm"
-                    onClick={() =>
-                      void copy(
-                        `<script src="${appUrl}/widget.js" data-form-id="${form.id}" defer></script>`,
-                      )
-                    }
-                  >
-                    Copy embed code
-                  </button>
-                  <button
-                    className="btn btn-light text-sm text-rose-600"
-                    onClick={() => void remove(form.id)}
-                  >
-                    Delete
-                  </button>
-                </div>
-                {form.published && (
-                  <Link
-                    className="mt-4 inline-block text-sm font-bold text-indigo-700"
-                    href={`/forms/${form.id}`}
-                  >
-                    Open public form ↗
-                  </Link>
-                )}
-              </article>
-            ))}
-            {forms.length === 0 && (
+
+                  <p className="mt-4 line-clamp-2 min-h-10 text-sm text-slate-600">
+                    {form.description || "No description added yet."}
+                  </p>
+
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-light text-sm"
+                      onClick={() =>
+                        setEditing({
+                          ...form,
+                          questions: form.questions.map((question) => ({
+                            ...question,
+                            options: question.options
+                              ? [...question.options]
+                              : undefined,
+                            condition: question.condition
+                              ? { ...question.condition }
+                              : undefined,
+                          })),
+                        })
+                      }
+                    >
+                      Edit
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-light text-sm"
+                      onClick={() => void duplicateForm(form)}
+                    >
+                      Duplicate
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-light text-sm"
+                      onClick={() =>
+                        void copy(`${appUrl}/forms/${form.id}`)
+                      }
+                    >
+                      Copy public link
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-light text-sm"
+                      onClick={() =>
+                        void copy(
+                          `<script src="${appUrl}/widget.js" data-form-id="${form.id}" defer></script>`
+                        )
+                      }
+                    >
+                      Copy embed code
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-light text-sm text-rose-600"
+                      onClick={() => void remove(form.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+
+                  {form.published && (
+                    <Link
+                      className="mt-4 inline-block text-sm font-bold text-indigo-700"
+                      href={`/forms/${form.id}`}
+                    >
+                      Open public form ↗
+                    </Link>
+                  )}
+                </article>
+              ))}
+
+            {forms.filter((form) => {
+              const search = formSearch.trim().toLowerCase();
+              const matchesSearch =
+                form.title.toLowerCase().includes(search) ||
+                (form.description ?? "").toLowerCase().includes(search);
+
+              const matchesFilter =
+                formFilter === "all" ||
+                (formFilter === "published" && form.published) ||
+                (formFilter === "draft" && !form.published);
+
+              return matchesSearch && matchesFilter;
+            }).length === 0 && (
               <div className="panel col-span-full p-10 text-center">
                 <div className="text-4xl">✦</div>
-                <h2 className="mt-3 text-xl font-bold">Your workspace starts here</h2>
+                <h2 className="mt-3 text-xl font-bold">
+                  {forms.length === 0
+                    ? "Your workspace starts here"
+                    : "No matching forms found"}
+                </h2>
                 <p className="mt-2 text-slate-500">
-                  Create your first form to start collecting responses.
+                  {forms.length === 0
+                    ? "Create your first form to start collecting responses."
+                    : "Try another search term or change the status filter."}
                 </p>
                 <button
+                  type="button"
                   className="btn btn-primary mt-5"
                   onClick={() => setEditing(emptyForm())}
                 >
@@ -574,26 +1008,31 @@ export default function Dashboard() {
           <div className="mt-5 space-y-4">
             {submissions.length === 0 ? (
               <div className="panel p-10 text-center text-slate-500">
-                No submissions yet. Publish a form and share its link to collect responses.
+                No submissions yet. Publish a form and share its link to
+                collect responses.
               </div>
             ) : (
               submissions.map((submission) => (
                 <article className="panel p-5" key={submission.id}>
                   <div className="flex flex-wrap justify-between gap-2">
                     <h3 className="font-bold">
-                      {forms.find((form) => form.id === submission.formId)?.title ??
-                        "Form response"}
+                      {forms.find(
+                        (form) => form.id === submission.formId
+                      )?.title ?? "Form response"}
                     </h3>
                     <time className="text-sm text-slate-500">
                       {new Date(submission.submittedAt).toLocaleString()}
                     </time>
                   </div>
+
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {Object.entries(submission.answers).map(([id, answer]) => {
                       const question = forms
                         .find((form) => form.id === submission.formId)
                         ?.questions.find((item) => item.id === id);
+
                       const isFile = question?.type === "file";
+
                       return (
                         <div key={id} className="rounded-xl bg-slate-50 p-3">
                           <p className="text-xs text-slate-500">
@@ -602,6 +1041,7 @@ export default function Dashboard() {
                           <p className="mt-1 break-words text-sm font-medium">
                             {isFile ? "Uploaded file" : answer}
                           </p>
+
                           {isFile && (
                             <button
                               type="button"
@@ -609,16 +1049,27 @@ export default function Dashboard() {
                               onClick={async () => {
                                 try {
                                   const response = await fetch(
-                                    `/api/file-access?path=${encodeURIComponent(answer)}`,
+                                    `/api/file-access?path=${encodeURIComponent(answer)}`
                                   );
                                   const result = await response.json();
+
                                   if (!response.ok || !result.url) {
-                                    alert(result.error ?? "Could not download this file.");
+                                    alert(
+                                      result.error ??
+                                        "Could not download this file."
+                                    );
                                     return;
                                   }
-                                  window.open(result.url, "_blank", "noopener,noreferrer");
+
+                                  window.open(
+                                    result.url,
+                                    "_blank",
+                                    "noopener,noreferrer"
+                                  );
                                 } catch {
-                                  alert("Could not download this file. Please try again.");
+                                  alert(
+                                    "Could not download this file. Please try again."
+                                  );
                                 }
                               }}
                             >
@@ -634,7 +1085,7 @@ export default function Dashboard() {
             )}
           </div>
         )}
-      </div>
+
 
       {editing && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8">
