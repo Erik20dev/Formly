@@ -25,6 +25,7 @@ export type Question = {
 };
 
 export type FormRecord = {
+  ownerId?: string | null;
   id: string;
   title: string;
   description: string;

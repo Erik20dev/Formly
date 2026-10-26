@@ -3,7 +3,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getForm } from "@/lib/store";
 import { checkUploadRateLimit } from "@/lib/rate-limit";
-
+import { getVisibleQuestions } from "@/lib/question-visibility";
+import { fileTypeFromBuffer } from "file-type";
 export const runtime = "nodejs";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
@@ -71,7 +72,33 @@ export async function POST(request: Request) {
     const file = data.get("file");
     const formId = data.get("formId");
     const questionId = data.get("questionId");
+const answersValue = data.get("answers");
+let answers: Record<string, string> = {};
 
+if (typeof answersValue === "string" && answersValue) {
+  try {
+    const parsed: unknown = JSON.parse(answersValue);
+
+    if (
+      typeof parsed !== "object" ||
+      parsed === null ||
+      Array.isArray(parsed) ||
+      Object.values(parsed).some((value) => typeof value !== "string")
+    ) {
+      return NextResponse.json(
+        { error: "Invalid answers provided for file upload." },
+        { status: 400 }
+      );
+    }
+
+    answers = parsed as Record<string, string>;
+  } catch {
+    return NextResponse.json(
+      { error: "Invalid answers provided for file upload." },
+      { status: 400 }
+    );
+  }
+}
     if (
       !(file instanceof File) ||
       typeof formId !== "string" ||
@@ -92,12 +119,21 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!ALLOWED_TYPES.has(file.type)) {
-      return NextResponse.json(
-        { error: "This file type is not allowed." },
-        { status: 400 }
-      );
-    }
+
+const fileBuffer = new Uint8Array(await file.arrayBuffer());
+const detectedType = await fileTypeFromBuffer(fileBuffer);
+
+if (
+  !detectedType ||
+  !ALLOWED_TYPES.has(detectedType.mime) ||
+  detectedType.mime !== file.type
+) {
+  return NextResponse.json(
+    { error: "The file contents do not match an allowed file type." },
+    { status: 400 }
+  );
+}
+
 
     const form = await getForm(formId);
 
@@ -109,9 +145,24 @@ export async function POST(request: Request) {
     }
 
     const question = form.questions.find(
-      (item) => item.id === questionId && item.type === "file"
-    );
+  (item) => item.id === questionId && item.type === "file"
+);
 
+if (!question) {
+  return NextResponse.json(
+    { error: "This file question does not exist." },
+    { status: 400 }
+  );
+}
+
+const visibleQuestions = getVisibleQuestions(form.questions, answers);
+
+if (!visibleQuestions.some((item) => item.id === questionId)) {
+  return NextResponse.json(
+    { error: "This file-upload question is not currently visible." },
+    { status: 400 }
+  );
+}
     if (!question) {
       return NextResponse.json(
         { error: "This file question does not exist." },

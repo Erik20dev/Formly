@@ -212,7 +212,7 @@ useEffect(() => {
           uploadData.append("file", file);
           uploadData.append("formId", form.id);
           uploadData.append("questionId", visibleQuestion.id);
-
+uploadData.append("answers", JSON.stringify(answers));
           const uploadResponse = await fetch("/api/uploads", {
             method: "POST",
             body: uploadData,
@@ -429,11 +429,11 @@ void fetch("/api/analytics", {
                           type="button"
                           key={option}
                           aria-pressed={answers[question.id] === option}
-                          className={`rounded-xl border bg-white p-4 font-bold ${
-                            answers[question.id] === option
-                              ? "border-indigo-400 ring-2 ring-indigo-100"
-                              : ""
-                          }`}
+                          className={`rounded-xl border p-4 font-bold ${
+  answers[question.id] === option
+    ? "border-indigo-400 bg-indigo-50 ring-2 ring-indigo-100"
+    : "border-gray-200 bg-white"
+}`}
                           onClick={() => answer(option)}
                         >
                           {option}

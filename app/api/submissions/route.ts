@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { createClient } from "@supabase/supabase-js";
 import { validateWebhookUrl } from "../../../lib/webhook-security";
+import { getVisibleQuestions } from "@/lib/question-visibility";
 async function notifyNewSubmission(
   formId: string,
   submissionId: string,
@@ -175,25 +176,30 @@ import {
   listSubmissions,
   saveSubmission,
 } from "@/lib/store";
-import { isAdminAuthenticated } from "@/lib/auth";
-import type { Question, Submission } from "@/lib/types";
+import { getApiActor } from "@/lib/api-auth";
+import type { Submission } from "@/lib/types";
 import { checkPublicRateLimit } from "@/lib/rate-limit";
+
 export async function GET(request: Request) {
-  if (!(await isAdminAuthenticated())) {
+  const actor = await getApiActor();
+
+  if (!actor) {
     return NextResponse.json(
-      { error: "Unauthorized. Please log in." },
+      { error: "Unauthorized" },
       { status: 401 }
     );
   }
 
   try {
     const url = new URL(request.url);
+    const formId = url.searchParams.get("formId") || undefined;
 
-    return NextResponse.json(
-      await listSubmissions(
-        url.searchParams.get("formId") || undefined
-      )
+    const submissions = await listSubmissions(
+      formId,
+      actor.kind === "user" ? actor.userId : undefined
     );
+
+    return NextResponse.json(submissions);
   } catch (error) {
     console.error("Submission processing failed:", error);
 
@@ -204,44 +210,11 @@ export async function GET(request: Request) {
   }
 }
 
-function getVisibleQuestions(
-  questions: Question[],
-  answers: Record<string, string>
-): Question[] {
-  const visibleQuestions: Question[] = [];
-  const visibleIds = new Set<string>();
 
-  for (const question of questions) {
-    const condition = question.condition;
-
-    if (condition) {
-      // Conditions may only depend on an earlier, visible question.
-      if (!visibleIds.has(condition.questionId)) {
-        continue;
-      }
-
-      const triggerAnswer = answers[condition.questionId] ?? "";
-
-      const matches =
-        condition.operator === "equals"
-          ? triggerAnswer === condition.value
-          : triggerAnswer !== condition.value;
-
-      if (!matches) {
-        continue;
-      }
-    }
-
-    visibleQuestions.push(question);
-    visibleIds.add(question.id);
-  }
-
-  return visibleQuestions;
-}
 
 export async function POST(request: Request) {
   try {
-        const forwardedFor = request.headers.get("x-forwarded-for");
+  const forwardedFor = request.headers.get("x-forwarded-for");
     const ip =
       request.headers.get("x-real-ip")?.trim() ||
       forwardedFor?.split(",")[0]?.trim() ||
@@ -371,6 +344,8 @@ export async function POST(request: Request) {
         );
       }
 
+
+
       if (
         question.type === "email" &&
         answer &&
@@ -432,6 +407,54 @@ export async function POST(request: Request) {
 
     // Store only answers to questions visible under the
     // server-calculated conditional rules.
+
+    // Verify that each file answer refers to an uploaded object
+    // belonging to this exact form and question.
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+    for (const question of visibleQuestions) {
+      if (question.type !== "file") continue;
+
+      const answer = (answers[question.id] ?? "").trim();
+      if (!answer) continue;
+
+      const parts = answer.split("/");
+      if (
+        parts.length !== 3 ||
+        parts[0] !== form.id ||
+        parts[1] !== question.id ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}-.+$/i.test(parts[2])
+      ) {
+        return NextResponse.json(
+          { error: `The uploaded file for "${question.label}" is invalid.` },
+          { status: 400 }
+        );
+      }
+
+      if (!supabaseUrl || !serviceKey) {
+        return NextResponse.json(
+          { error: "File verification is temporarily unavailable." },
+          { status: 503 }
+        );
+      }
+
+      const storageClient = createClient(supabaseUrl, serviceKey);
+      const { data, error } = await storageClient.storage
+        .from("form-uploads")
+        .list(`${form.id}/${question.id}`, {
+          search: parts[2],
+          limit: 100,
+        });
+
+      if (error || !data?.some((file) => file.name === parts[2])) {
+        return NextResponse.json(
+          { error: `The uploaded file for "${question.label}" could not be verified.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const visibleAnswers: Record<string, string> = {};
 
     for (const question of visibleQuestions) {
