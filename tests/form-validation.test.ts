@@ -6,11 +6,13 @@ const {
   saveSubmissionMock,
   isAdminAuthenticatedMock,
   checkPublicRateLimitMock,
+  storageListMock,
 } = vi.hoisted(() => ({
   getFormMock: vi.fn(),
   saveSubmissionMock: vi.fn(),
   isAdminAuthenticatedMock: vi.fn(),
   checkPublicRateLimitMock: vi.fn(),
+  storageListMock: vi.fn(),
 }));
 
 vi.mock("@/lib/store", () => ({
@@ -25,6 +27,17 @@ vi.mock("@/lib/auth", () => ({
 vi.mock("@/lib/rate-limit", () => ({
   checkPublicRateLimit: checkPublicRateLimitMock,
 }));
+
+vi.mock("@supabase/supabase-js", () => ({
+  createClient: vi.fn(() => ({
+    storage: {
+      from: vi.fn(() => ({
+        list: storageListMock,
+      })),
+    },
+  })),
+}));
+
 import { POST } from "../app/api/submissions/route";
 
 const publishedForm = {
@@ -140,6 +153,72 @@ describe("POST /api/submissions", () => {
       q1: "Yes",
       q2: "alex@example.com",
     });
+  });
+
+
+  it("rejects a file path belonging to another form or question", async () => {
+    getFormMock.mockResolvedValue({
+      ...publishedForm,
+      questions: [
+        ...publishedForm.questions,
+        {
+          id: "q3",
+          label: "Attachment",
+          type: "file",
+          required: false,
+        },
+      ],
+    });
+
+    const response = await POST(
+      request({
+        formId: "form-1",
+        answers: {
+          q1: "No",
+          q3: "another-form/q3/12345678-1234-1234-1234-123456789abc-document.pdf",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(saveSubmissionMock).not.toHaveBeenCalled();
+    expect(storageListMock).not.toHaveBeenCalled();
+  });
+
+  it("rejects a file that does not exist in storage", async () => {
+        vi.stubEnv("NEXT_PUBLIC_SUPABASE_URL", "https://example.supabase.co");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "test-service-key");
+    getFormMock.mockResolvedValue({
+      ...publishedForm,
+      questions: [
+        ...publishedForm.questions,
+        {
+          id: "q3",
+          label: "Attachment",
+          type: "file",
+          required: false,
+        },
+      ],
+    });
+
+    storageListMock.mockResolvedValue({
+      data: [],
+      error: null,
+    });
+
+    const response = await POST(
+      request({
+        formId: "form-1",
+        answers: {
+          q1: "No",
+          q3: "form-1/q3/12345678-1234-1234-1234-123456789abc-document.pdf",
+        },
+      }),
+    );
+
+    expect(response.status).toBe(400);
+    expect(saveSubmissionMock).not.toHaveBeenCalled();
+    expect(storageListMock).toHaveBeenCalledOnce();
   });
 
   it("rejects answers to a hidden conditional question", async () => {

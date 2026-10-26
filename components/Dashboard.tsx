@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -9,14 +10,15 @@ import type {
   Submission,
 } from "@/lib/types";
 import { getFormAnalytics } from "@/lib/analytics";
+
 const DRAFT_STORAGE_KEY = "formly-editor-draft";
+
 type AnalyticsEvent = {
   form_id: string;
   event_type: "view" | "start" | "completion";
   session_id: string;
   created_at: string;
 };
-
 
 const emptyForm = (): FormRecord => ({
   id: crypto.randomUUID(),
@@ -153,7 +155,7 @@ const FORM_TEMPLATES: {
 ];
 
 function createFormFromTemplate(
-  template: (typeof FORM_TEMPLATES)[number]
+  template: (typeof FORM_TEMPLATES)[number],
 ): FormRecord {
   return {
     id: crypto.randomUUID(),
@@ -179,10 +181,13 @@ function defaultOptions(type: Question["type"]): string[] | undefined {
 
 function getConditionOptions(question: Question): string[] {
   if (question.type === "yesno") return ["Yes", "No"];
+
   if (question.type === "choice" || question.type === "dropdown") {
     return question.options ?? [];
   }
+
   if (question.type === "rating") return ["1", "2", "3", "4", "5"];
+
   return [];
 }
 
@@ -198,7 +203,12 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [formSearch, setFormSearch] = useState("");
-const [formFilter, setFormFilter] = useState("all");
+  const [formFilter, setFormFilter] = useState("all");
+  const [widgetPosition, setWidgetPosition] = useState<"right" | "left">(
+    "right",
+  );
+  const [widgetAvatar, setWidgetAvatar] = useState("✦");
+
   // Recover an unfinished form draft when the dashboard opens.
   useEffect(() => {
     const savedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -217,7 +227,7 @@ const [formFilter, setFormFilter] = useState("all");
       }
 
       const recover = window.confirm(
-        `Recover your unfinished draft "${parsed.form.title}"?`
+        `Recover your unfinished draft "${parsed.form.title}"?`,
       );
 
       if (recover) {
@@ -242,7 +252,7 @@ const [formFilter, setFormFilter] = useState("all");
           JSON.stringify({
             form: editing,
             savedAt: new Date().toISOString(),
-          })
+          }),
         );
       } catch {
         setMessage("Could not save a local draft in this browser.");
@@ -251,6 +261,7 @@ const [formFilter, setFormFilter] = useState("all");
 
     return () => window.clearTimeout(timeoutId);
   }, [editing]);
+
   const analytics = getFormAnalytics(
     forms,
     submissions,
@@ -258,10 +269,12 @@ const [formFilter, setFormFilter] = useState("all");
     endDate || undefined,
   );
 
-  const appUrl = typeof window === "undefined" ? "" : window.location.origin;
+  const appUrl =
+    typeof window === "undefined" ? "" : window.location.origin;
 
   async function refresh() {
     setLoading(true);
+
     try {
       const [formsResponse, submissionsResponse, analyticsResponse] =
         await Promise.all([
@@ -293,6 +306,7 @@ const [formFilter, setFormFilter] = useState("all");
   useEffect(() => {
     void refresh();
   }, []);
+
   async function save() {
     if (!editing) return;
 
@@ -352,42 +366,44 @@ const [formFilter, setFormFilter] = useState("all");
       }
 
       window.localStorage.removeItem(DRAFT_STORAGE_KEY);
-setEditing(null);
-setMessage("Form saved successfully.");
+      setEditing(null);
+      setMessage("Form saved successfully.");
       await refresh();
     } catch {
       setMessage("Could not save form. Please check your connection.");
     }
   }
-async function remove(formId: string) {
-  const confirmed = window.confirm(
-    "Are you sure you want to delete this form? All saved submissions for this form will also be permanently deleted."
-  );
 
-  if (!confirmed) return;
+  async function remove(formId: string) {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete this form? All saved submissions for this form will also be permanently deleted.",
+    );
 
-  try {
-    const response = await fetch(`/api/forms/${formId}`, {
-      method: "DELETE",
-    });
+    if (!confirmed) return;
 
-    const result = await response.json();
+    try {
+      const response = await fetch(`/api/forms/${formId}`, {
+        method: "DELETE",
+      });
 
-    if (!response.ok) {
-      setMessage(result.error || "Could not delete form.");
-      return;
+      const result = await response.json();
+
+      if (!response.ok) {
+        setMessage(result.error || "Could not delete form.");
+        return;
+      }
+
+      if (editing?.id === formId) {
+        setEditing(null);
+      }
+
+      setMessage("Form deleted successfully.");
+      await refresh();
+    } catch {
+      setMessage("Could not delete form. Please check your connection.");
     }
-
-    if (editing?.id === formId) {
-      setEditing(null);
-    }
-
-    setMessage("Form deleted successfully.");
-    await refresh();
-  } catch {
-    setMessage("Could not delete form. Please check your connection.");
   }
-}
+
   async function duplicateForm(form: FormRecord) {
     const questionIdMap = new Map(
       form.questions.map((question) => [
@@ -440,18 +456,20 @@ async function remove(formId: string) {
     }
   }
 
-
   async function copy(text: string) {
     try {
       await navigator.clipboard.writeText(text);
       setMessage("Copied to clipboard.");
     } catch {
+      // If clipboard access is blocked, show the code so it can be copied manually.
+      setMessage("Clipboard access failed. The code is shown in the message below.");
       setMessage(text);
     }
   }
 
   function updateQuestion(index: number, patch: Partial<Question>) {
     if (!editing) return;
+
     setEditing({
       ...editing,
       questions: editing.questions.map((question, i) =>
@@ -469,6 +487,7 @@ async function remove(formId: string) {
 
   function addQuestion() {
     if (!editing) return;
+
     setEditing({
       ...editing,
       questions: [
@@ -485,18 +504,23 @@ async function remove(formId: string) {
 
   function moveQuestion(index: number, direction: -1 | 1) {
     if (!editing) return;
+
     const questions = [...editing.questions];
     const targetIndex = index + direction;
+
     if (targetIndex < 0 || targetIndex >= questions.length) return;
+
     [questions[index], questions[targetIndex]] = [
       questions[targetIndex],
       questions[index],
     ];
+
     setEditing({ ...editing, questions });
   }
 
   function deleteQuestion(id: string) {
     if (!editing) return;
+
     setEditing({
       ...editing,
       questions: editing.questions
@@ -511,12 +535,20 @@ async function remove(formId: string) {
 
   function exportAnalyticsCsv() {
     const rows: string[][] = [
-      ["Form", "Total Responses", "Question", "Total Answers", "Answer", "Count"],
+      [
+        "Form",
+        "Total Responses",
+        "Question",
+        "Total Answers",
+        "Answer",
+        "Count",
+      ],
     ];
 
     for (const form of analytics) {
       for (const question of form.responsesByQuestion) {
         const answers = Object.entries(question.answerCounts);
+
         if (answers.length === 0) {
           rows.push([
             form.title,
@@ -548,6 +580,7 @@ async function remove(formId: string) {
     });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
+
     link.href = url;
     link.download = "formly-analytics.csv";
     link.click();
@@ -561,6 +594,7 @@ async function remove(formId: string) {
           <Link href="/" className="text-2xl font-black">
             <span className="text-indigo-600">●</span> formly
           </Link>
+
           <Link href="/" className="text-sm font-semibold text-slate-600">
             ← Back to website
           </Link>
@@ -579,7 +613,6 @@ async function remove(formId: string) {
             </p>
           </div>
 
-         
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
@@ -599,89 +632,83 @@ async function remove(formId: string) {
             >
               ＋ Create form
             </button>
-
-            {showTemplateGallery && (
-              <div
-                className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
-                onClick={() => setShowTemplateGallery(false)}
-              >
-                <section
-                  role="dialog"
-                  aria-modal="true"
-                  aria-labelledby="template-gallery-title"
-                  className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <h2
-                        id="template-gallery-title"
-                        className="text-2xl font-black"
-                      >
-                        Start with a template
-                      </h2>
-                      <p className="mt-2 text-sm text-slate-500">
-                        Choose a starting point, then customize it in the form
-                        editor.
-                      </p>
-                    </div>
-
-                    <button
-                      type="button"
-                      aria-label="Close template gallery"
-                      className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
-                      onClick={() => setShowTemplateGallery(false)}
-                    >
-                      Close
-                    </button>
-                  </div>
-
-                  <div className="mt-6 grid gap-4 sm:grid-cols-2">
-                    {FORM_TEMPLATES.map((template, index) => (
-                      <button
-                        key={template.name}
-                        type="button"
-                        className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-indigo-400 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                        onClick={() => {
-                          setEditing(createFormFromTemplate(template));
-                          setMessage(
-                            `${template.name} template opened as a new draft.`
-                          );
-                          setShowTemplateGallery(false);
-                        }}
-                      >
-                        <span className="text-sm font-bold text-indigo-600">
-                          TEMPLATE {String(index + 1).padStart(2, "0")}
-                        </span>
-                        <h3 className="mt-2 text-lg font-bold">
-                          {template.name}
-                        </h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">
-                          {template.description}
-                        </p>
-                        <p className="mt-4 text-xs font-semibold text-slate-500">
-                          {template.questions.length} questions · Unpublished
-                          draft
-                        </p>
-                        <span className="mt-4 inline-block text-sm font-bold text-indigo-700">
-                          Use this template →
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </section>
-              </div>
-            )}
           </div>
-
-          </div>
-
         </div>
+
+        {showTemplateGallery && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4"
+            onClick={() => setShowTemplateGallery(false)}
+          >
+            <section
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="template-gallery-title"
+              className="max-h-[85vh] w-full max-w-3xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2
+                    id="template-gallery-title"
+                    className="text-2xl font-black"
+                  >
+                    Start with a template
+                  </h2>
+                  <p className="mt-2 text-sm text-slate-500">
+                    Choose a starting point, then customize it in the form
+                    editor.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  aria-label="Close template gallery"
+                  className="rounded-lg border px-3 py-2 text-sm font-semibold hover:bg-slate-50"
+                  onClick={() => setShowTemplateGallery(false)}
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                {FORM_TEMPLATES.map((template, index) => (
+                  <button
+                    key={template.name}
+                    type="button"
+                    className="rounded-xl border border-slate-200 p-5 text-left transition hover:border-indigo-400 hover:bg-indigo-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    onClick={() => {
+                      setEditing(createFormFromTemplate(template));
+                      setMessage(
+                        `${template.name} template opened as a new draft.`,
+                      );
+                      setShowTemplateGallery(false);
+                    }}
+                  >
+                    <span className="text-sm font-bold text-indigo-600">
+                      TEMPLATE {String(index + 1).padStart(2, "0")}
+                    </span>
+                    <h3 className="mt-2 text-lg font-bold">{template.name}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      {template.description}
+                    </p>
+                    <p className="mt-4 text-xs font-semibold text-slate-500">
+                      {template.questions.length} questions · Unpublished draft
+                    </p>
+                    <span className="mt-4 inline-block text-sm font-bold text-indigo-700">
+                      Use this template →
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          </div>
+        )}
 
         {message && (
           <div
             role="status"
-            className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800"
+            className="mt-5 break-words rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-indigo-800"
           >
             {message}
           </div>
@@ -699,23 +726,35 @@ async function remove(formId: string) {
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
           <Stat
             label="Form views"
-            value={analyticsEvents.filter((event) => event.event_type === "view").length}
+            value={
+              analyticsEvents.filter((event) => event.event_type === "view")
+                .length
+            }
           />
           <Stat
             label="Form starts"
-            value={analyticsEvents.filter((event) => event.event_type === "start").length}
+            value={
+              analyticsEvents.filter((event) => event.event_type === "start")
+                .length
+            }
           />
           <Stat
             label="Form completions"
-            value={analyticsEvents.filter((event) => event.event_type === "completion").length}
+            value={
+              analyticsEvents.filter(
+                (event) => event.event_type === "completion",
+              ).length
+            }
           />
         </div>
 
         <section className="panel mt-6 p-5">
           <h2 className="text-xl font-black">Response analytics</h2>
           <p className="mt-1 text-sm text-slate-500">
-            See how many responses each form has received and review answers by question.
+            See how many responses each form has received and review answers by
+            question.
           </p>
+
           <div className="mt-4 grid gap-4 sm:grid-cols-2">
             <label className="block text-sm font-semibold">
               Start date
@@ -726,6 +765,7 @@ async function remove(formId: string) {
                 className="mt-1 block w-full rounded-lg border border-slate-300 p-2"
               />
             </label>
+
             <label className="block text-sm font-semibold">
               End date
               <input
@@ -737,6 +777,7 @@ async function remove(formId: string) {
               />
             </label>
           </div>
+
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
@@ -748,6 +789,7 @@ async function remove(formId: string) {
             >
               Clear date filters
             </button>
+
             <button
               type="button"
               onClick={exportAnalyticsCsv}
@@ -771,23 +813,31 @@ async function remove(formId: string) {
                       {form.totalResponses} responses
                     </span>
                   </div>
+
                   {form.responsesByQuestion.map((question) => (
                     <div key={question.questionId} className="mt-4">
-                      <p className="text-sm font-semibold">{question.questionLabel}</p>
+                      <p className="text-sm font-semibold">
+                        {question.questionLabel}
+                      </p>
                       <p className="mt-1 text-xs text-slate-500">
                         {question.totalAnswers} answers
                       </p>
+
                       {Object.keys(question.answerCounts).length > 0 ? (
                         <ul className="mt-2 space-y-1">
-                          {Object.entries(question.answerCounts).map(([answer, count]) => (
-                            <li
-                              key={answer}
-                              className="flex justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"
-                            >
-                              <span className="break-words">{answer}</span>
-                              <span className="shrink-0 font-bold">{count}</span>
-                            </li>
-                          ))}
+                          {Object.entries(question.answerCounts).map(
+                            ([answer, count]) => (
+                              <li
+                                key={answer}
+                                className="flex justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm"
+                              >
+                                <span className="break-words">{answer}</span>
+                                <span className="shrink-0 font-bold">
+                                  {count}
+                                </span>
+                              </li>
+                            ),
+                          )}
                         </ul>
                       ) : (
                         <p className="mt-2 text-sm text-slate-400">
@@ -804,6 +854,7 @@ async function remove(formId: string) {
 
         <div className="mt-8 flex gap-2 border-b">
           <button
+            type="button"
             onClick={() => setActiveTab("forms")}
             className={`px-4 py-3 text-sm font-bold ${
               activeTab === "forms"
@@ -813,7 +864,9 @@ async function remove(formId: string) {
           >
             My forms
           </button>
+
           <button
+            type="button"
             onClick={() => setActiveTab("responses")}
             className={`px-4 py-3 text-sm font-bold ${
               activeTab === "responses"
@@ -825,7 +878,6 @@ async function remove(formId: string) {
           </button>
         </div>
 
-        
         {loading ? (
           <p className="py-12 text-slate-500">Loading workspace…</p>
         ) : activeTab === "forms" ? (
@@ -875,7 +927,7 @@ async function remove(formId: string) {
                         {form.questions.length} questions ·{" "}
                         {
                           submissions.filter(
-                            (submission) => submission.formId === form.id
+                            (submission) => submission.formId === form.id,
                           ).length
                         }{" "}
                         responses
@@ -930,24 +982,69 @@ async function remove(formId: string) {
                     <button
                       type="button"
                       className="btn btn-light text-sm"
-                      onClick={() =>
-                        void copy(`${appUrl}/forms/${form.id}`)
-                      }
+                      onClick={() => void copy(`${appUrl}/forms/${form.id}`)}
                     >
                       Copy public link
                     </button>
 
-                    <button
-                      type="button"
-                      className="btn btn-light text-sm"
-                      onClick={() =>
-                        void copy(
-                          `<script src="${appUrl}/widget.js" data-form-id="${form.id}" defer></script>`
-                        )
-                      }
-                    >
-                      Copy embed code
-                    </button>
+                    <div className="w-full grid gap-3 sm:grid-cols-2">
+                      <label className="text-sm font-semibold text-slate-600">
+                        Widget position
+                        <select
+                          className="field mt-2"
+                          value={widgetPosition}
+                          onChange={(event) =>
+                            setWidgetPosition(
+                              event.target.value as "right" | "left",
+                            )
+                          }
+                        >
+                          <option value="right">Bottom right</option>
+                          <option value="left">Bottom left</option>
+                        </select>
+                      </label>
+
+                      <label className="text-sm font-semibold text-slate-600">
+                        Widget avatar
+                        <select
+                          className="field mt-2"
+                          value={widgetAvatar}
+                          onChange={(event) =>
+                            setWidgetAvatar(event.target.value)
+                          }
+                        >
+                          <option value="✦">Star ✦</option>
+                          <option value="💬">Chat bubble 💬</option>
+                          <option value="?">Help ?</option>
+                        </select>
+                      </label>
+                    </div>
+
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        className="btn btn-light text-sm"
+                        onClick={() =>
+                          void copy(
+                            `<script src="${appUrl}/widget.js" data-form-id="${form.id}" data-color="${form.accentColor || "#4f46e5"}" data-position="${widgetPosition}" data-avatar="${widgetAvatar}" data-mode="floating" defer></script>`,
+                          )
+                        }
+                      >
+                        Copy floating widget code
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-light text-sm"
+                        onClick={() =>
+                          void copy(
+                            `<div id="formly-inline-${form.id}"></div>\n<script src="${appUrl}/widget.js" data-form-id="${form.id}" data-color="${form.accentColor || "#4f46e5"}" data-mode="inline" data-target="#formly-inline-${form.id}" defer></script>`,
+                          )
+                        }
+                      >
+                        Copy inline embed code
+                      </button>
+                    </div>
 
                     <button
                       type="button"
@@ -1017,7 +1114,7 @@ async function remove(formId: string) {
                   <div className="flex flex-wrap justify-between gap-2">
                     <h3 className="font-bold">
                       {forms.find(
-                        (form) => form.id === submission.formId
+                        (form) => form.id === submission.formId,
                       )?.title ?? "Form response"}
                     </h3>
                     <time className="text-sm text-slate-500">
@@ -1049,14 +1146,14 @@ async function remove(formId: string) {
                               onClick={async () => {
                                 try {
                                   const response = await fetch(
-                                    `/api/file-access?path=${encodeURIComponent(answer)}`
+                                    `/api/file-access?path=${encodeURIComponent(answer)}`,
                                   );
                                   const result = await response.json();
 
                                   if (!response.ok || !result.url) {
                                     alert(
                                       result.error ??
-                                        "Could not download this file."
+                                        "Could not download this file.",
                                     );
                                     return;
                                   }
@@ -1064,11 +1161,11 @@ async function remove(formId: string) {
                                   window.open(
                                     result.url,
                                     "_blank",
-                                    "noopener,noreferrer"
+                                    "noopener,noreferrer",
                                   );
                                 } catch {
                                   alert(
-                                    "Could not download this file. Please try again."
+                                    "Could not download this file. Please try again.",
                                   );
                                 }
                               }}
@@ -1086,329 +1183,422 @@ async function remove(formId: string) {
           </div>
         )}
 
+        {editing && (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8">
+            <div className="mx-auto my-4 max-w-3xl rounded-2xl bg-white p-5 shadow-2xl sm:p-8">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-indigo-600">
+                    FORM BUILDER
+                  </p>
+                  <h2 className="mt-1 text-2xl font-black">
+                    {forms.some((form) => form.id === editing.id)
+                      ? "Edit form"
+                      : "Create a form"}
+                  </h2>
+                </div>
 
-      {editing && (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/50 p-3 sm:p-8">
-          <div className="mx-auto my-4 max-w-3xl rounded-2xl bg-white p-5 shadow-2xl sm:p-8">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-sm font-bold text-indigo-600">FORM BUILDER</p>
-                <h2 className="mt-1 text-2xl font-black">
-                  {forms.some((form) => form.id === editing.id) ? "Edit form" : "Create a form"}
-                </h2>
+                <button
+                  type="button"
+                  className="rounded-lg px-3 py-2 text-xl text-slate-500"
+                  onClick={() => setEditing(null)}
+                  aria-label="Close"
+                >
+                  ×
+                </button>
               </div>
-              <button
-                className="rounded-lg px-3 py-2 text-xl text-slate-500"
-                onClick={() => setEditing(null)}
-                aria-label="Close"
-              >
-                ×
-              </button>
-            </div>
 
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              <label className="text-sm font-bold">
-                Form title
-                <input
-                  className="field mt-2 font-normal"
-                  value={editing.title}
-                  onChange={(event) => setEditing({ ...editing, title: event.target.value })}
-                  required
-                />
-              </label>
-              <label className="text-sm font-bold">
-                Description
-                <textarea
-                  className="field mt-2 font-normal"
-                  rows={2}
-                  value={editing.description}
-                  onChange={(event) =>
-                    setEditing({ ...editing, description: event.target.value })
-                  }
-                />
-              </label>
-              <label className="text-sm font-bold">
-                Welcome message
-                <input
-                  className="field mt-2 font-normal"
-                  value={editing.welcomeText}
-                  onChange={(event) => setEditing({ ...editing, welcomeText: event.target.value })}
-                />
-              </label>
-              <label className="text-sm font-bold">
-                Completion message
-                <input
-                  className="field mt-2 font-normal"
-                  value={editing.completionText}
-                  onChange={(event) =>
-                    setEditing({ ...editing, completionText: event.target.value })
-                  }
-                />
-              </label>
-              <label className="text-sm font-bold">
-                Accent color
-                <input
-                  className="field mt-2 h-11 p-1"
-                  type="color"
-                  value={editing.accentColor}
-                  onChange={(event) => setEditing({ ...editing, accentColor: event.target.value })}
-                />
-              </label>
-              <label className="flex items-center gap-3 text-sm font-bold">
-                <input
-                  type="checkbox"
-                  checked={editing.published}
-                  onChange={(event) =>
-                    setEditing({ ...editing, published: event.target.checked })
-                  }
-                />
-                Publish form
-              </label>
-            </div>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2">
+                <label className="text-sm font-bold">
+                  Form title
+                  <input
+                    className="field mt-2 font-normal"
+                    value={editing.title}
+                    onChange={(event) =>
+                      setEditing({ ...editing, title: event.target.value })
+                    }
+                    required
+                  />
+                </label>
 
-            <div className="mt-8 flex items-center justify-between gap-3">
-              <h3 className="text-lg font-black">Questions</h3>
-              <button className="btn btn-light text-sm" onClick={addQuestion}>
-                ＋ Add question
-              </button>
-            </div>
-            <p className="mt-2 text-sm text-slate-500">
-              Conditional logic lets you show a question based on an answer to another question.
-              Configure a rule below each question.
-            </p>
+                <label className="text-sm font-bold">
+                  Description
+                  <textarea
+                    className="field mt-2 font-normal"
+                    rows={2}
+                    value={editing.description}
+                    onChange={(event) =>
+                      setEditing({
+                        ...editing,
+                        description: event.target.value,
+                      })
+                    }
+                  />
+                </label>
 
-            <div className="mt-4 space-y-4">
-              {editing.questions.map((question, index) => {
-                const availableTriggers = editing.questions.filter(
-                  (candidate, candidateIndex) =>
-                    candidateIndex < index &&
-                    (candidate.type === "yesno" ||
-                      candidate.type === "choice" ||
-                      candidate.type === "dropdown" ||
-                      candidate.type === "rating"),
-                );
-                const selectedTrigger = availableTriggers.find(
-                  (candidate) => candidate.id === question.condition?.questionId,
-                );
-                const triggerOptions = selectedTrigger ? getConditionOptions(selectedTrigger) : [];
+                <label className="text-sm font-bold">
+                  Welcome message
+                  <input
+                    className="field mt-2 font-normal"
+                    value={editing.welcomeText}
+                    onChange={(event) =>
+                      setEditing({
+                        ...editing,
+                        welcomeText: event.target.value,
+                      })
+                    }
+                  />
+                </label>
 
-                return (
-                  <div className="rounded-xl border border-slate-200 p-4" key={question.id}>
-                    <div className="flex items-start gap-3">
-                      <span className="mt-3 text-sm font-black text-slate-400">
-                        {String(index + 1).padStart(2, "0")}
-                      </span>
-                      <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_170px]">
-                        <input
-                          className="field"
-                          value={question.label}
-                          aria-label="Question label"
-                          onChange={(event) => updateQuestion(index, { label: event.target.value })}
-                        />
-                        <select
-                          className="field"
-                          aria-label="Question type"
-                          value={question.type}
-                          onChange={(event) => {
-                            const type = event.target.value as Question["type"];
-                            updateQuestion(index, {
-                              type,
-                              options:
-                                type === "choice" || type === "dropdown"
-                                  ? question.options?.length
-                                    ? question.options
-                                    : defaultOptions(type)
-                                  : undefined,
-                            });
-                          }}
+                <label className="text-sm font-bold">
+                  Completion message
+                  <input
+                    className="field mt-2 font-normal"
+                    value={editing.completionText}
+                    onChange={(event) =>
+                      setEditing({
+                        ...editing,
+                        completionText: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="text-sm font-bold">
+                  Accent color
+                  <input
+                    className="field mt-2 h-11 p-1"
+                    type="color"
+                    value={editing.accentColor}
+                    onChange={(event) =>
+                      setEditing({
+                        ...editing,
+                        accentColor: event.target.value,
+                      })
+                    }
+                  />
+                </label>
+
+                <label className="flex items-center gap-3 text-sm font-bold">
+                  <input
+                    type="checkbox"
+                    checked={editing.published}
+                    onChange={(event) =>
+                      setEditing({
+                        ...editing,
+                        published: event.target.checked,
+                      })
+                    }
+                  />
+                  Publish form
+                </label>
+              </div>
+
+              <div className="mt-8 flex items-center justify-between gap-3">
+                <h3 className="text-lg font-black">Questions</h3>
+                <button
+                  type="button"
+                  className="btn btn-light text-sm"
+                  onClick={addQuestion}
+                >
+                  ＋ Add question
+                </button>
+              </div>
+
+              <p className="mt-2 text-sm text-slate-500">
+                Conditional logic lets you show a question based on an answer
+                to another question. Configure a rule below each question.
+              </p>
+
+              <div className="mt-4 space-y-4">
+                {editing.questions.map((question, index) => {
+                  const availableTriggers = editing.questions.filter(
+                    (candidate, candidateIndex) =>
+                      candidateIndex < index &&
+                      (candidate.type === "yesno" ||
+                        candidate.type === "choice" ||
+                        candidate.type === "dropdown" ||
+                        candidate.type === "rating"),
+                  );
+
+                  const selectedTrigger = availableTriggers.find(
+                    (candidate) =>
+                      candidate.id === question.condition?.questionId,
+                  );
+
+                  const triggerOptions = selectedTrigger
+                    ? getConditionOptions(selectedTrigger)
+                    : [];
+
+                  return (
+                    <div
+                      className="rounded-xl border border-slate-200 p-4"
+                      key={question.id}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className="mt-3 text-sm font-black text-slate-400">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+
+                        <div className="grid flex-1 gap-3 sm:grid-cols-[1fr_170px]">
+                          <input
+                            className="field"
+                            value={question.label}
+                            aria-label="Question label"
+                            onChange={(event) =>
+                              updateQuestion(index, {
+                                label: event.target.value,
+                              })
+                            }
+                          />
+
+                          <select
+                            className="field"
+                            aria-label="Question type"
+                            value={question.type}
+                            onChange={(event) => {
+                              const type = event.target.value as Question["type"];
+
+                              updateQuestion(index, {
+                                type,
+                                options:
+                                  type === "choice" || type === "dropdown"
+                                    ? question.options?.length
+                                      ? question.options
+                                      : defaultOptions(type)
+                                    : undefined,
+                              });
+                            }}
+                          >
+                            <option value="text">Short text</option>
+                            <option value="email">Email</option>
+                            <option value="choice">Multiple choice</option>
+                            <option value="yesno">Yes / No</option>
+                            <option value="dropdown">Dropdown</option>
+                            <option value="rating">Rating</option>
+                            <option value="date">Date</option>
+                            <option value="file">File upload</option>
+                          </select>
+                        </div>
+
+                        <button
+                          type="button"
+                          className="px-2 py-2 text-rose-600"
+                          onClick={() => deleteQuestion(question.id)}
+                          aria-label="Delete question"
                         >
-                          <option value="text">Short text</option>
-                          <option value="email">Email</option>
-                          <option value="choice">Multiple choice</option>
-                          <option value="yesno">Yes / No</option>
-                          <option value="dropdown">Dropdown</option>
-                          <option value="rating">Rating</option>
-                          <option value="date">Date</option>
-                          <option value="file">File upload</option>
-                        </select>
+                          ✕
+                        </button>
                       </div>
-                      <button
-                        className="px-2 py-2 text-rose-600"
-                        onClick={() => deleteQuestion(question.id)}
-                        aria-label="Delete question"
-                      >
-                        ✕
-                      </button>
-                    </div>
 
-                    {(question.type === "choice" || question.type === "dropdown") && (
-                      <label className="mt-3 block pl-8 text-sm font-semibold">
-                        Options (separate with commas)
+                      {(question.type === "choice" ||
+                        question.type === "dropdown") && (
+                        <label className="mt-3 block pl-8 text-sm font-semibold">
+                          Options (separate with commas)
+                          <input
+                            className="field mt-2 font-normal"
+                            value={(question.options ?? []).join(", ")}
+                            placeholder="Option 1, Option 2, Option 3"
+                            onChange={(event) =>
+                              updateQuestion(index, {
+                                options: event.target.value
+                                  .split(",")
+                                  .map((value) => value.trim())
+                                  .filter(Boolean),
+                              })
+                            }
+                          />
+                        </label>
+                      )}
+
+                      <div className="mt-4 rounded-xl bg-slate-50 p-3">
+                        <label className="flex items-center gap-2 text-sm font-bold">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(question.condition)}
+                            disabled={availableTriggers.length === 0}
+                            onChange={(event) => {
+                              if (!event.target.checked) {
+                                setQuestionCondition(index, undefined);
+                                return;
+                              }
+
+                              const trigger = availableTriggers[0];
+                              const options = getConditionOptions(trigger);
+
+                              setQuestionCondition(index, {
+                                questionId: trigger.id,
+                                operator: "equals",
+                                value: options[0] ?? "",
+                              });
+                            }}
+                          />
+                          Show this question only when a condition is met
+                        </label>
+
+                        {availableTriggers.length === 0 && (
+                          <p className="mt-2 text-xs text-slate-500">
+                            Add an earlier Yes / No, Multiple choice, Dropdown,
+                            or Rating question to use conditional logic here.
+                          </p>
+                        )}
+
+                        {question.condition &&
+                          availableTriggers.length > 0 && (
+                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                              <label className="text-xs font-semibold text-slate-600">
+                                When the answer to
+                                <select
+                                  className="field mt-1 text-sm font-normal"
+                                  value={
+                                    selectedTrigger?.id ??
+                                    question.condition.questionId
+                                  }
+                                  onChange={(event) => {
+                                    const trigger = availableTriggers.find(
+                                      (candidate) =>
+                                        candidate.id === event.target.value,
+                                    );
+
+                                    if (!trigger) return;
+
+                                    const options = getConditionOptions(trigger);
+
+                                    setQuestionCondition(index, {
+                                      questionId: trigger.id,
+                                      operator:
+                                        question.condition?.operator ??
+                                        "equals",
+                                      value: options[0] ?? "",
+                                    });
+                                  }}
+                                >
+                                  {availableTriggers.map((trigger) => (
+                                    <option
+                                      key={trigger.id}
+                                      value={trigger.id}
+                                    >
+                                      {trigger.label || "Untitled question"}
+                                    </option>
+                                  ))}
+                                </select>
+                              </label>
+
+                              <label className="text-xs font-semibold text-slate-600">
+                                Comparison
+                                <select
+                                  className="field mt-1 text-sm font-normal"
+                                  value={question.condition.operator}
+                                  onChange={(event) =>
+                                    setQuestionCondition(index, {
+                                      ...question.condition!,
+                                      operator: event.target.value as
+                                        | "equals"
+                                        | "not_equals",
+                                    })
+                                  }
+                                >
+                                  <option value="equals">Equals</option>
+                                  <option value="not_equals">
+                                    Does not equal
+                                  </option>
+                                </select>
+                              </label>
+
+                              <label className="text-xs font-semibold text-slate-600">
+                                This answer
+                                {triggerOptions.length > 0 ? (
+                                  <select
+                                    className="field mt-1 text-sm font-normal"
+                                    value={question.condition.value}
+                                    onChange={(event) =>
+                                      setQuestionCondition(index, {
+                                        ...question.condition!,
+                                        value: event.target.value,
+                                      })
+                                    }
+                                  >
+                                    {triggerOptions.map((option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    ))}
+                                  </select>
+                                ) : (
+                                  <input
+                                    className="field mt-1 text-sm font-normal"
+                                    value={question.condition.value}
+                                    onChange={(event) =>
+                                      setQuestionCondition(index, {
+                                        ...question.condition!,
+                                        value: event.target.value,
+                                      })
+                                    }
+                                  />
+                                )}
+                              </label>
+                            </div>
+                          )}
+                      </div>
+
+                      <label className="mt-3 flex items-center gap-2 pl-8 text-sm text-slate-600">
                         <input
-                          className="field mt-2 font-normal"
-                          value={(question.options ?? []).join(", ")}
-                          placeholder="Option 1, Option 2, Option 3"
+                          type="checkbox"
+                          checked={question.required}
                           onChange={(event) =>
                             updateQuestion(index, {
-                              options: event.target.value
-                                .split(",")
-                                .map((value) => value.trim())
-                                .filter(Boolean),
+                              required: event.target.checked,
                             })
                           }
                         />
-                      </label>
-                    )}
-
-                    <div className="mt-4 rounded-xl bg-slate-50 p-3">
-                      <label className="flex items-center gap-2 text-sm font-bold">
-                        <input
-                          type="checkbox"
-                          checked={Boolean(question.condition)}
-                          disabled={availableTriggers.length === 0}
-                          onChange={(event) => {
-                            if (!event.target.checked) {
-                              setQuestionCondition(index, undefined);
-                              return;
-                            }
-                            const trigger = availableTriggers[0];
-                            const options = getConditionOptions(trigger);
-                            setQuestionCondition(index, {
-                              questionId: trigger.id,
-                              operator: "equals",
-                              value: options[0] ?? "",
-                            });
-                          }}
-                        />
-                        Show this question only when a condition is met
+                        Required question
                       </label>
 
-                      {availableTriggers.length === 0 && (
-                        <p className="mt-2 text-xs text-slate-500">
-                          Add an earlier Yes / No, Multiple choice, Dropdown, or Rating question
-                          to use conditional logic here.
-                        </p>
-                      )}
+                      <div className="mt-3 flex gap-2 pl-8">
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-indigo-700 disabled:text-slate-300"
+                          disabled={index === 0}
+                          onClick={() => moveQuestion(index, -1)}
+                        >
+                          ↑ Move up
+                        </button>
 
-                      {question.condition && availableTriggers.length > 0 && (
-                        <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                          <label className="text-xs font-semibold text-slate-600">
-                            When the answer to
-                            <select
-                              className="field mt-1 text-sm font-normal"
-                              value={selectedTrigger?.id ?? question.condition.questionId}
-                              onChange={(event) => {
-                                const trigger = availableTriggers.find(
-                                  (candidate) => candidate.id === event.target.value,
-                                );
-                                if (!trigger) return;
-                                const options = getConditionOptions(trigger);
-                                setQuestionCondition(index, {
-                                  questionId: trigger.id,
-                                  operator: question.condition?.operator ?? "equals",
-                                  value: options[0] ?? "",
-                                });
-                              }}
-                            >
-                              {availableTriggers.map((trigger) => (
-                                <option key={trigger.id} value={trigger.id}>
-                                  {trigger.label || "Untitled question"}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="text-xs font-semibold text-slate-600">
-                            Comparison
-                            <select
-                              className="field mt-1 text-sm font-normal"
-                              value={question.condition.operator}
-                              onChange={(event) =>
-                                setQuestionCondition(index, {
-                                  ...question.condition!,
-                                  operator: event.target.value as "equals" | "not_equals",
-                                })
-                              }
-                            >
-                              <option value="equals">Equals</option>
-                              <option value="not_equals">Does not equal</option>
-                            </select>
-                          </label>
-                          <label className="text-xs font-semibold text-slate-600">
-                            This answer
-                            {triggerOptions.length > 0 ? (
-                              <select
-                                className="field mt-1 text-sm font-normal"
-                                value={question.condition.value}
-                                onChange={(event) =>
-                                  setQuestionCondition(index, {
-                                    ...question.condition!,
-                                    value: event.target.value,
-                                  })
-                                }
-                              >
-                                {triggerOptions.map((option) => (
-                                  <option key={option} value={option}>{option}</option>
-                                ))}
-                              </select>
-                            ) : (
-                              <input
-                                className="field mt-1 text-sm font-normal"
-                                value={question.condition.value}
-                                onChange={(event) =>
-                                  setQuestionCondition(index, {
-                                    ...question.condition!,
-                                    value: event.target.value,
-                                  })
-                                }
-                              />
-                            )}
-                          </label>
-                        </div>
-                      )}
+                        <button
+                          type="button"
+                          className="text-xs font-bold text-indigo-700 disabled:text-slate-300"
+                          disabled={index === editing.questions.length - 1}
+                          onClick={() => moveQuestion(index, 1)}
+                        >
+                          ↓ Move down
+                        </button>
+                      </div>
                     </div>
+                  );
+                })}
+              </div>
 
-                    <label className="mt-3 flex items-center gap-2 pl-8 text-sm text-slate-600">
-                      <input
-                        type="checkbox"
-                        checked={question.required}
-                        onChange={(event) =>
-                          updateQuestion(index, { required: event.target.checked })
-                        }
-                      />
-                      Required question
-                    </label>
-                    <div className="mt-3 flex gap-2 pl-8">
-                      <button
-                        className="text-xs font-bold text-indigo-700 disabled:text-slate-300"
-                        disabled={index === 0}
-                        onClick={() => moveQuestion(index, -1)}
-                      >
-                        ↑ Move up
-                      </button>
-                      <button
-                        className="text-xs font-bold text-indigo-700 disabled:text-slate-300"
-                        disabled={index === editing.questions.length - 1}
-                        onClick={() => moveQuestion(index, 1)}
-                      >
-                        ↓ Move down
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+              <div className="mt-7 flex flex-wrap justify-end gap-3 border-t pt-5">
+                <button
+                  type="button"
+                  className="btn btn-light"
+                  onClick={() => setEditing(null)}
+                >
+                  Cancel
+                </button>
 
-            <div className="mt-7 flex flex-wrap justify-end gap-3 border-t pt-5">
-              <button className="btn btn-light" onClick={() => setEditing(null)}>
-                Cancel
-              </button>
-              <button className="btn btn-primary" onClick={() => void save()}>
-                Save form
-              </button>
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => void save()}
+                >
+                  Save form
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </main>
   );
 }

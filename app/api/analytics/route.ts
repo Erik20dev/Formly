@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { getForm } from "@/lib/store";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { getApiActor } from "@/lib/api-auth";
 import { checkPublicRateLimit } from "@/lib/rate-limit";
 export const dynamic = "force-dynamic";
 
@@ -102,12 +102,14 @@ export async function POST(request: Request) {
 }
 
 export async function GET() {
-  if (!(await isAdminAuthenticated())) {
-    return NextResponse.json(
-      { error: "Unauthorized. Please log in." },
-      { status: 401 },
-    );
-  }
+  const actor = await getApiActor();
+
+if (!actor) {
+  return NextResponse.json(
+    { error: "Unauthorized" },
+    { status: 401 }
+  );
+}
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -121,10 +123,34 @@ export async function GET() {
 
   try {
     const supabase = createClient(url, key);
-    const { data, error } = await supabase
-      .from("form_analytics_events")
-      .select("form_id, event_type, session_id, created_at")
-      .order("created_at", { ascending: false });
+    let query = supabase
+  .from("form_analytics_events")
+  .select("form_id, event_type, session_id, created_at")
+  .order("created_at", { ascending: false });
+
+if (actor.kind === "user") {
+  const { data: ownedForms, error: formsError } = await supabase
+    .from("forms")
+    .select("id")
+    .eq("owner_id", actor.userId);
+
+  if (formsError) {
+    return NextResponse.json(
+      { error: "Unable to load analytics." },
+      { status: 500 }
+    );
+  }
+
+  const ownedFormIds = (ownedForms ?? []).map((form) => form.id);
+
+  if (ownedFormIds.length === 0) {
+    return NextResponse.json({ events: [] });
+  }
+
+  query = query.in("form_id", ownedFormIds);
+}
+
+const { data, error } = await query;
 
     if (error) {
       console.error("Analytics retrieval failed:", error.message);

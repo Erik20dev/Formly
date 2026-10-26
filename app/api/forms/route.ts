@@ -1,16 +1,23 @@
 
 import { NextResponse } from "next/server";
-import { listForms, saveForm } from "@/lib/store";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { getForm, listForms, saveForm } from "@/lib/store";
+import { getApiActor } from "@/lib/api-auth";
 import type { FormRecord } from "@/lib/types";
+import { validateQuestions } from "@/lib/question-validation";
 
 export async function GET() {
   try {
-    if (!(await isAdminAuthenticated())) {
+    const actor = await getApiActor();
+
+    if (!actor) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    return NextResponse.json(await listForms());
+    const forms = await listForms(
+      actor.kind === "user" ? actor.userId : undefined
+    );
+
+    return NextResponse.json(forms);
   } catch (error) {
     return NextResponse.json(
       { error: message(error) },
@@ -19,25 +26,51 @@ export async function GET() {
   }
 }
 
+
+
 export async function POST(request: Request) {
   try {
-    if (!(await isAdminAuthenticated())) {
+    const actor = await getApiActor();
+
+    if (!actor) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const body = await request.json() as Partial<FormRecord>;
 
+
     if (!body.title?.trim()) {
       return NextResponse.json(
-        { error: "Form title is required." },
+        { error: "A form title is required." },
         { status: 400 }
       );
+    }
+
+    const questions = body.questions === undefined ? [] : body.questions;
+
+    if (!validateQuestions(questions)) {
+      return NextResponse.json(
+        { error: "One or more questions have an invalid configuration." },
+        { status: 400 }
+      );
+    }
+
+    if (actor.kind === "user" && body.id) {
+      const existingForm = await getForm(body.id, actor.userId);
+
+      if (!existingForm) {
+        return NextResponse.json(
+          { error: "Form not found." },
+          { status: 404 }
+        );
+      }
     }
 
     const now = new Date().toISOString();
 
     const form: FormRecord = {
       id: body.id || crypto.randomUUID(),
+      ownerId: actor.kind === "user" ? actor.userId : undefined,
       title: body.title.trim(),
       description: body.description?.trim() ?? "",
       published: Boolean(body.published),
@@ -47,18 +80,17 @@ export async function POST(request: Request) {
       accentColor: /^#[0-9a-fA-F]{6}$/.test(body.accentColor ?? "")
         ? body.accentColor!
         : "#4f46e5",
-      questions: Array.isArray(body.questions) ? body.questions : [],
+      questions,
       createdAt: body.createdAt || now,
     };
 
-    if (form.questions.some(q => !q.label?.trim())) {
-      return NextResponse.json(
-        { error: "Every question needs a label." },
-        { status: 400 }
-      );
-    }
 
-    return NextResponse.json(await saveForm(form), { status: 201 });
+
+    const savedForm = await saveForm(form);
+
+    return NextResponse.json(savedForm, {
+      status: body.id ? 200 : 201,
+    });
   } catch (error) {
     return NextResponse.json(
       { error: message(error) },
@@ -66,6 +98,7 @@ export async function POST(request: Request) {
     );
   }
 }
+
 
 function message(error: unknown) {
   return error instanceof Error

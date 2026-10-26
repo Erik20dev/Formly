@@ -1,8 +1,9 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
-import { isAdminAuthenticated } from "@/lib/auth";
+import { getApiActor } from "@/lib/api-auth";
 import { getForm, listSubmissions } from "@/lib/store";
+import { getVisibleQuestions } from "@/lib/question-visibility";
 
 export const runtime = "nodejs";
 
@@ -10,9 +11,11 @@ const BUCKET = "form-uploads";
 const SIGNED_URL_SECONDS = 60;
 
 export async function GET(request: Request) {
-  if (!(await isAdminAuthenticated())) {
+  const actor = await getApiActor();
+
+  if (!actor) {
     return NextResponse.json(
-      { error: "Unauthorized. Please log in." },
+      { error: "Unauthorized" },
       { status: 401 }
     );
   }
@@ -31,8 +34,10 @@ export async function GET(request: Request) {
     const parts = path.split("/");
 
     if (
-      parts.length < 3 ||
-      parts.some((part) => !part || part === "." || part === "..")
+      parts.length !== 3 ||
+      parts.some(
+        (part) => !part || part === "." || part === ".."
+      )
     ) {
       return NextResponse.json(
         { error: "Invalid file path." },
@@ -41,27 +46,50 @@ export async function GET(request: Request) {
     }
 
     const [formId, questionId] = parts;
-    const form = await getForm(formId);
+
+    const form = await getForm(
+      formId,
+      actor.kind === "user" ? actor.userId : undefined
+    );
 
     if (
       !form ||
       !form.questions.some(
-        (question) => question.id === questionId && String(question.type) === "file"
+        (question) =>
+          question.id === questionId &&
+          String(question.type) === "file"
       )
     ) {
       return NextResponse.json(
-        { error: "This file does not belong to a valid file-upload question." },
+        {
+          error:
+            "This file does not belong to a valid file-upload question.",
+        },
         { status: 404 }
       );
     }
 
-    const submissions = await listSubmissions(formId);
-    const belongsToSubmission = submissions.some((submission) =>
-      Object.entries(submission.answers).some(
-        ([answerQuestionId, answer]) =>
-          answerQuestionId === questionId && answer === path
-      )
+    const submissions = await listSubmissions(
+      formId,
+      actor.kind === "user" ? actor.userId : undefined
     );
+
+    const belongsToSubmission = submissions.some((submission) => {
+      const answer = submission.answers[questionId];
+
+      if (answer !== path) {
+        return false;
+      }
+
+      const visibleQuestions = getVisibleQuestions(
+        form.questions,
+        submission.answers
+      );
+
+      return visibleQuestions.some(
+        (visibleQuestion) => visibleQuestion.id === questionId
+      );
+    });
 
     if (!belongsToSubmission) {
       return NextResponse.json(
@@ -91,7 +119,11 @@ export async function GET(request: Request) {
       });
 
     if (error || !data?.signedUrl) {
-      console.error("Could not create file link:", error?.message);
+      console.error(
+        "Could not create file link:",
+        error?.message
+      );
+
       return NextResponse.json(
         { error: "Could not create a download link for this file." },
         { status: 500 }
@@ -104,6 +136,7 @@ export async function GET(request: Request) {
     });
   } catch (error) {
     console.error("File access request failed:", error);
+
     return NextResponse.json(
       { error: "The file access request could not be processed." },
       { status: 500 }

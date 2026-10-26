@@ -1,17 +1,23 @@
 
 import { redirect } from "next/navigation";
 import { isAdminAuthenticated } from "@/lib/auth";
+import { getCurrentUserProfile } from "@/lib/user-auth";
 import Dashboard from "@/components/Dashboard";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
-  const authenticated = await isAdminAuthenticated();
+  const adminAuthenticated = await isAdminAuthenticated();
 
-  if (!authenticated) {
+  if (adminAuthenticated) {
+    return <Dashboard />;
+  }
+
+  const profile = await getCurrentUserProfile();
+
+  if (!profile || profile.status !== "active") {
     redirect("/login");
   }
 
   return <Dashboard />;
 }
-
