@@ -204,11 +204,21 @@ export default function Dashboard() {
   const [showTemplateGallery, setShowTemplateGallery] = useState(false);
   const [formSearch, setFormSearch] = useState("");
   const [formFilter, setFormFilter] = useState("all");
-  const [widgetPosition, setWidgetPosition] = useState<"right" | "left">(
-    "right",
-  );
+  const [widgetPosition, setWidgetPosition] = useState<"right" | "left">("right");
   const [widgetAvatar, setWidgetAvatar] = useState("✦");
-
+  const [widgetSettingsLoaded, setWidgetSettingsLoaded] = useState(false);
+  useEffect(() => {
+    const savedPosition = window.localStorage.getItem("formly-widget-position");
+    const savedAvatar = window.localStorage.getItem("formly-widget-avatar");
+    setWidgetPosition(savedPosition === "left" ? "left" : "right");
+    setWidgetAvatar(savedAvatar || "✦");
+    setWidgetSettingsLoaded(true);
+  }, []);
+  useEffect(() => {
+    if (!widgetSettingsLoaded) return;
+    window.localStorage.setItem("formly-widget-position", widgetPosition);
+    window.localStorage.setItem("formly-widget-avatar", widgetAvatar);
+  }, [widgetSettingsLoaded, widgetPosition, widgetAvatar]);
   // Recover an unfinished form draft when the dashboard opens.
   useEffect(() => {
     const savedDraft = window.localStorage.getItem(DRAFT_STORAGE_KEY);
@@ -993,11 +1003,11 @@ export default function Dashboard() {
                         <select
                           className="field mt-2"
                           value={widgetPosition}
-                          onChange={(event) =>
-                            setWidgetPosition(
-                              event.target.value as "right" | "left",
-                            )
-                          }
+                          onChange={(event) => {
+  const position = event.target.value as "right" | "left";
+  setWidgetPosition(position);
+  window.localStorage.setItem("formly-widget-position", position);
+}}
                         >
                           <option value="right">Bottom right</option>
                           <option value="left">Bottom left</option>
@@ -1009,9 +1019,11 @@ export default function Dashboard() {
                         <select
                           className="field mt-2"
                           value={widgetAvatar}
-                          onChange={(event) =>
-                            setWidgetAvatar(event.target.value)
-                          }
+                          onChange={(event) => {
+  const avatar = event.target.value;
+  setWidgetAvatar(avatar);
+  window.localStorage.setItem("formly-widget-avatar", avatar);
+}}
                         >
                           <option value="✦">Star ✦</option>
                           <option value="💬">Chat bubble 💬</option>
