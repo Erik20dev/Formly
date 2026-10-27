@@ -314,6 +314,20 @@ void fetch("/api/analytics", {
               <div className="text-3xl">✓</div>
               <h2 className="mt-3 text-xl font-bold">Response submitted</h2>
               <p className="mt-2 text-slate-700">{form.completionText}</p>
+              <button
+                type="button"
+                className="btn btn-primary mt-5"
+                style={{ background: form.accentColor }}
+                onClick={() => {
+                  setAnswers({});
+                  setSelectedFiles({});
+                  setStep(-1);
+                  setError("");
+                  setDone(false);
+                }}
+              >
+                Start again
+              </button>
             </div>
           ) : (
             <div className="mt-6 rounded-2xl bg-slate-50 p-4 sm:p-6">
