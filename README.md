@@ -1,4 +1,4 @@
-\# Formly — Interactive Form Builder
+# Formly — Interactive Form Builder
 
 
 
@@ -6,61 +6,63 @@ Formly is a full-stack form builder built with Next.js, React, TypeScript, Tailw
 
 
 
-**Live demo:** https://formly-opal.vercel.app\*\*GitHub repository:\*\* https://github.com/Erik20dev/Formly
+**Live demo:** https://formly-opal.vercel.app
+
+**GitHub repository:** https://github.com/Erik20dev/Formly
 
 
 
-\## Features
+## Features
 
 
 
-\- Create, edit, delete, duplicate, save, and publish forms.
+- Create, edit, delete, duplicate, save, and publish forms.
 
-\- Eight question types: short text, email, multiple choice, yes/no, dropdown, rating, date, and file upload.
+- Eight question types: short text, email, multiple choice, yes/no, dropdown, rating, date, and file upload.
 
-\- Required-field and email validation.
+- Required-field and email validation.
 
-\- Conditional questions based on previous answers.
+- Conditional questions based on previous answers.
 
-\- Customizable welcome and completion messages and accent color.
+- Customizable welcome and completion messages and accent color.
 
-\- Public form links and floating or inline website embedding.
+- Public form links and floating or inline website embedding.
 
-\- Widget position and avatar customization.
+- Widget position and avatar customization.
 
-\- Restart the form after submission.
+- Restart the form after submission.
 
-\- File uploads with file-size and allowed-type validation.
+- File uploads with file-size and allowed-type validation.
 
-\- Saved submissions with timestamps and dashboard response views.
+- Saved submissions with timestamps and dashboard response views.
 
-\- Analytics for form activity and responses, date filters, question-level statistics, and CSV export.
+- Analytics for form activity and responses, date filters, question-level statistics, and CSV export.
 
-\- Email notifications and webhook delivery tracking when configured.
+- Email notifications and webhook delivery tracking when configured.
 
-\- Supabase/PostgreSQL persistence, with in-memory fallback for supported local demos.
+- Supabase/PostgreSQL persistence, with in-memory fallback for supported local demos.
 
-\- Authentication checks, rate limiting, and server-side validation.
+- Authentication checks, rate limiting, and server-side validation.
 
-\- Automated tests for form validation, question validation, upload security, and webhook security.
-
-
-
-\## Requirements
+- Automated tests for form validation, question validation, upload security, and webhook security.
 
 
 
-\- Node.js 20 or newer
-
-\- npm
-
-\- Supabase for persistent database storage
-
-\- Upstash Redis credentials for configured rate limiting
+## Requirements
 
 
 
-\## Run locally
+- Node.js 20 or newer
+
+- npm
+
+- Supabase for persistent database storage
+
+- Upstash Redis credentials for configured rate limiting
+
+
+
+## Run locally
 
 
 
@@ -100,7 +102,7 @@ Without Supabase credentials, supported demo functionality may use in-memory sto
 
 
 
-\## Environment configuration
+## Environment configuration
 
 
 
@@ -148,23 +150,23 @@ Use `.env.example` and the application code to confirm which variables are requi
 
 
 
-\### Security
+### Security
 
 
 
-\- Never commit `.env.local` or actual credentials to GitHub.
+- Never commit `.env.local` or actual credentials to GitHub.
 
-\- Keep the Supabase service-role key server-side; it bypasses Row Level Security.
+- Keep the Supabase service-role key server-side; it bypasses Row Level Security.
 
-\- Use strong, unique administrative passwords and session secrets.
+- Use strong, unique administrative passwords and session secrets.
 
-\- Configure production environment variables in Vercel before deployment.
+- Configure production environment variables in Vercel before deployment.
 
-\- Review authorization, database policies, file-upload validation, and abuse prevention before expanding the platform to multiple independent customers.
+- Review authorization, database policies, file-upload validation, and abuse prevention before expanding the platform to multiple independent customers.
 
 
 
-\## Use the app
+## Use the app
 
 
 
@@ -182,7 +184,7 @@ Use `.env.example` and the application code to confirm which variables are requi
 
 
 
-\## Testing and production build
+## Testing and production build
 
 
 
@@ -214,7 +216,7 @@ Before releasing changes, confirm that tests pass and the production build compl
 
 
 
-\## API overview
+## API overview
 
 
 
@@ -240,7 +242,7 @@ Access requirements and validation vary by endpoint. Administrative operations s
 
 
 
-\## Deployment
+## Deployment
 
 
 
@@ -258,12 +260,12 @@ Access requirements and validation vary by endpoint. Administrative operations s
 
 
 
-\## Current limitations
+## Current limitations
 
 
 
-\- The shared administrative session does not by itself provide individual user accounts, per-user ownership boundaries, or role-based access control.
+- The shared administrative session does not by itself provide individual user accounts, per-user ownership boundaries, or role-based access control.
 
-\- Features such as email notifications and webhook delivery require their corresponding configuration.
+- Features such as email notifications and webhook delivery require their corresponding configuration.
 
-\- Review production security, authorization, database policies, and monitoring before using the platform for multiple independent customers.
+- Review production security, authorization, database policies, and monitoring before using the platform for multiple independent customers.
