@@ -75,9 +75,7 @@ Clone the repository and enter the project folder:
 ```bash
 
 git clone https://github.com/Erik20dev/Formly.git
-
 cd Formly
-
 npm install
 
 ```
