@@ -86,11 +86,6 @@ Without Supabase credentials, supported demo functionality may use in-memory sto
 
 ## Environment configuration
 
-Configure the required environment variables in `.env.local` for local development and in Vercel for deployment. The variables used depend on your setup.
-
-Example variable names:
-
-```env
 NEXT_PUBLIC_SUPABASE_URL=
 SUPABASE_SERVICE_ROLE_KEY=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
@@ -107,11 +102,6 @@ RESEND_API_KEY=
 RESEND_FROM_EMAIL=
 
 FORM_WEBHOOK_URL=
-```
-
-These are placeholders, not working credentials. Refer to `.env.example` and the application code to confirm which variables are required.
-
-Email notifications require the relevant Resend configuration. Webhook delivery requires a valid destination URL. File uploads require correctly configured Supabase Storage.
 
 ## Security
 
@@ -176,26 +166,13 @@ Before releasing changes, confirm that tests pass and the production build compl
 
 
 | Method | Endpoint | Purpose |
-
 |---|---|---|
-
 | GET | `/api/forms` | List forms, subject to access rules |
-
 | POST | `/api/forms` | Create or update a form |
-
-| GET | `/api/forms/\[id]` | Retrieve a form |
-
-| DELETE | `/api/forms/\[id]` | Delete a form and related submissions |
-
+| GET | `/api/forms/[id]` | Retrieve a form |
+| DELETE | `/api/forms/[id]` | Delete a form and related submissions |
 | GET | `/api/submissions?formId=...` | Retrieve submissions |
-
 | POST | `/api/submissions` | Validate and save a submission |
-
-
-
-Access requirements and validation vary by endpoint. Administrative operations should require appropriate authorization, while public form submissions must remain available to legitimate respondents.
-
-
 
 ## Deployment
 
