@@ -45,6 +45,8 @@ Formly is a full-stack form builder built with Next.js, React, TypeScript, Tailw
 - Authentication checks, rate limiting, and server-side validation.
 
 - Automated tests for form validation, question validation, upload security, and webhook security.
+- Individual user accounts with role-based access and account status management.
+- Administrative user management, including user search, suspension, reactivation, and platform activity monitoring.
 
 
 
@@ -262,10 +264,8 @@ Access requirements and validation vary by endpoint. Administrative operations s
 
 ## Current limitations
 
-
-
-- The shared administrative session does not by itself provide individual user accounts, per-user ownership boundaries, or role-based access control.
-
-- Features such as email notifications and webhook delivery require their corresponding configuration.
-
-- Review production security, authorization, database policies, and monitoring before using the platform for multiple independent customers.
+- Email notifications require valid Resend configuration, including a verified sender address. Production email delivery must be tested after configuration.
+- Webhook delivery requires a valid destination URL and appropriate configuration.
+- The inline embed snippet should be tested on an external website before relying on it in production.
+- File uploads require correctly configured Supabase Storage.
+- The application should undergo further multi-user authorization and production security testing before handling sensitive customer data.
