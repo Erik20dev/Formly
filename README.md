@@ -66,105 +66,60 @@ Formly is a full-stack form builder built with Next.js, React, TypeScript, Tailw
 
 ## Run locally
 
-
-
 Clone the repository and enter the project folder:
 
-
-
 ```bash
-
 git clone https://github.com/Erik20dev/Formly.git
 cd Formly
 npm install
-
 ```
-
-
 
 Create a `.env.local` file using `.env.example` as a reference. Configure the environment variables required by the application, then start the development server:
 
-
-
 ```bash
-
 npm run dev
-
 ```
-
-
 
 Open http://localhost:3000. If that port is occupied, use the local URL displayed in the terminal.
 
-
-
 Without Supabase credentials, supported demo functionality may use in-memory storage. Data stored in memory is not persistent and can be lost when the server restarts.
-
-
 
 ## Environment configuration
 
+Configure the required environment variables in `.env.local` for local development and in Vercel for deployment. The variables used depend on your setup.
 
-
-Configure the variables used by your deployment in `.env.local` and in the corresponding Vercel environment settings. Depending on the features enabled, these may include:
-
-
+Example variable names:
 
 ```env
+NEXT_PUBLIC_SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+NEXT_PUBLIC_APP_URL=
 
-NEXT\_PUBLIC\_SUPABASE\_URL=
+ADMIN_PASSWORD=
+SESSION_SECRET=
 
-SUPABASE\_SERVICE\_ROLE\_KEY=
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 
-NEXT\_PUBLIC\_APP\_URL=
+FORM_NOTIFICATION_EMAIL=
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
 
-
-
-ADMIN\_PASSWORD=
-
-SESSION\_SECRET=
-
-
-
-UPSTASH\_REDIS\_REST\_URL=
-
-UPSTASH\_REDIS\_REST\_TOKEN=
-
-
-
-FORM\_NOTIFICATION\_EMAIL=
-
-RESEND\_API\_KEY=
-
-RESEND\_FROM\_EMAIL=
-
-
-
-FORM\_WEBHOOK\_URL=
-
+FORM_WEBHOOK_URL=
 ```
 
+These are placeholders, not working credentials. Refer to `.env.example` and the application code to confirm which variables are required.
 
+Email notifications require the relevant Resend configuration. Webhook delivery requires a valid destination URL. File uploads require correctly configured Supabase Storage.
 
-Use `.env.example` and the application code to confirm which variables are required for your setup. Email notifications require the relevant email configuration; the webhook URL is optional.
-
-
-
-### Security
-
-
+## Security
 
 - Never commit `.env.local` or actual credentials to GitHub.
-
 - Keep the Supabase service-role key server-side; it bypasses Row Level Security.
-
 - Use strong, unique administrative passwords and session secrets.
-
 - Configure production environment variables in Vercel before deployment.
-
 - Review authorization, database policies, file-upload validation, and abuse prevention before expanding the platform to multiple independent customers.
-
-
 
 ## Use the app
 
